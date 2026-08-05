@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Профиль — {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card profile-card">
+        <div class="card-header">
+            <h2 class="mb-0">👤 Мой профиль</h2>
+        </div>
+        <div class="card-body">
+            <dl class="profile-info">
+                <dt>ID</dt>
+                <dd>{{ user.id }}</dd>
+                <dt>Email</dt>
+                <dd>{{ user.email }}</dd>
+                <dt>Имя</dt>
+                <dd>{{ user.username }}</dd>
+                <dt>Статус</dt>
+                <dd>
+                    <span class="badge {% if user.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                        {{ "✅ Активен" if user.is_active else "❌ Деактивирован" }}
+                    </span>
+                </dd>
+                <dt>Зарегистрирован</dt>
+                <dd>{{ user.created_at.strftime('%d.%m.%Y %H:%M') if user.created_at else '—' }}</dd>
+            </dl>
+
+            <hr class="border-light">
+
+            <h3>📊 Статистика входов</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Всего попыток</th>
+                            <th>Успешных</th>
+                            <th>Неудачных</th>
+                            <th>Последний вход</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ stats.total_attempts }}</td>
+                            <td>{{ stats.successful }}</td>
+                            <td>{{ stats.failed }}</td>
+                            <td>
+                                {% if stats.last_success_at %}
+                                    {{ stats.last_success_at.strftime('%d.%m.%Y %H:%M') }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="actions mt-4">
+                <a href="/api/v1/web_lk/logout" class="btn btn-danger">Выйти</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

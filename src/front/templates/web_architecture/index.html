@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Архитектура приложения{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="background-color: #000 !important; min-height: 100vh; color: #fff !important;">
+    <h1 class="mb-4" style="color: #ffd700 !important;">🏛️ Архитектура приложения</h1>
+
+    <!-- Панель поиска и фильтров -->
+    <div class="row mb-3 g-2">
+        <div class="col-md-5">
+            <input type="text" id="searchInput" class="form-control" placeholder="🔍 Поиск по пути, методам, тегам, описанию..." style="background-color: #1a1a1a !important; color: #ffd700 !important; border: 1px solid #ffd700 !important;">
+        </div>
+        <div class="col-md-3">
+            <select id="methodFilter" class="form-select" style="background-color: #1a1a1a !important; color: #ffd700 !important; border: 1px solid #ffd700 !important;">
+                <option value="all">Все методы</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button id="clearFilters" class="btn" style="width:100%; background-color: #ffd700 !important; color: #000 !important; border: 1px solid #ffd700 !important;">
+                Сбросить
+            </button>
+        </div>
+        <div class="col-md-2 text-end">
+            <span id="routeCount" style="color: #ffd700;">Найдено: 0</span>
+        </div>
+    </div>
+
+    <div class="accordion accordion-flush" id="archAccordion">
+        <!-- Блок: Маршруты (первый, красный фон, белый текст) -->
+        <div class="accordion-item" style="background-color: #dc3545 !important; border: 1px solid #fff !important;">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#routesCollapse"
+                        style="background-color: #dc3545 !important; color: #fff !important;">
+                    🔗 Маршруты
+                </button>
+            </h2>
+            <div id="routesCollapse" class="accordion-collapse collapse show" data-bs-parent="#archAccordion">
+                <div class="accordion-body" style="background-color: #dc3545 !important; color: #fff !important;" id="routesContainer">
+                    <p style="color: #fff !important;">Загрузка...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Блок: Приложения (чёрный фон, жёлтый текст) -->
+        <div class="accordion-item" style="background-color: #000 !important; border: 1px solid #ffd700 !important;">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#appsCollapse"
+                        style="background-color: #000 !important; color: #ffd700 !important;">
+                    📦 Приложения
+                </button>
+            </h2>
+            <div id="appsCollapse" class="accordion-collapse collapse" data-bs-parent="#archAccordion">
+                <div class="accordion-body" style="background-color: #000 !important; color: #ffd700 !important;" id="appsContainer">
+                    <p style="color: #ffd700 !important;">Загрузка...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Блок: Модели БД (чёрный фон, жёлтый текст) -->
+        <div class="accordion-item" style="background-color: #000 !important; border: 1px solid #ffd700 !important;">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#modelsCollapse"
+                        style="background-color: #000 !important; color: #ffd700 !important;">
+                    🗄️ Модели БД
+                </button>
+            </h2>
+            <div id="modelsCollapse" class="accordion-collapse collapse" data-bs-parent="#archAccordion">
+                <div class="accordion-body" style="background-color: #000 !important; color: #ffd700 !important;" id="modelsContainer">
+                    <p style="color: #ffd700 !important;">Загрузка...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== СВОЙ БЛОК (пример) ====== -->
+        <!-- ПРАВИЛО: на белом фоне использовать ТОЛЬКО чёрный текст (#000) -->
+        <!--
+        <div class="accordion-item" style="background-color: #fff !important; border: 1px solid #000 !important;">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#myCustomBlock"
+                        style="background-color: #fff !important; color: #000 !important;">
+                    ⚙️ Мой кастомный блок (белый фон, чёрный текст)
+                </button>
+            </h2>
+            <div id="myCustomBlock" class="accordion-collapse collapse" data-bs-parent="#archAccordion">
+                <div class="accordion-body" style="background-color: #fff !important; color: #000 !important;">
+                    Здесь твой произвольный HTML-код (только чёрный текст на белом фоне).
+                </div>
+            </div>
+        </div>
+        -->
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Глобальные переменные для хранения данных
+    let allRoutes = [];
+    let filteredRoutes = [];
+    let allApps = [];
+    let allModels = [];
+
+    // Элементы DOM
+    const searchInput = document.getElementById('searchInput');
+    const methodFilter = document.getElementById('methodFilter');
+    const clearBtn = document.getElementById('clearFilters');
+    const routeCountSpan = document.getElementById('routeCount');
+
+    // Функции рендеринга
+    function renderApps(apps) {
+        const container = document.getElementById('appsContainer');
+        if (!apps || apps.length === 0) {
+            container.innerHTML = '<p style="color: #ffd700 !important;">Нет приложений</p>';
+            return;
+        }
+        let html = '<div class="row row-cols-1 row-cols-md-3 g-3">';
+        apps.forEach(app => {
+            html += `
+                <div class="col">
+                    <div class="card h-100" style="background-color: #1a1a1a !important; border: 1px solid #ffd700 !important; color: #ffd700 !important;">
+                        <div class="card-body">
+                            <h5 class="card-title" style="color: #ffd700 !important;">${app.name || app.prefix || 'Без имени'}</h5>
+                            <p class="card-text" style="color: #ffd700 !important;"><small>Префикс: ${app.prefix || '—'}</small></p>
+                            <p class="card-text" style="color: #ffd700 !important;"><small>Описание: ${app.description || '—'}</small></p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function renderRoutes(routes) {
+        const container = document.getElementById('routesContainer');
+        if (!routes || routes.length === 0) {
+            container.innerHTML = '<p style="color: #fff !important;">Нет маршрутов</p>';
+            return;
+        }
+        let html = `
+            <div class="table-responsive">
+                <table class="table" style="background-color: #b71c1c !important; color: #fff !important;">
+                    <thead>
+                        <tr style="background-color: #b71c1c !important; color: #fff !important;">
+                            <th style="background-color: #b71c1c !important; color: #fff !important;">Методы</th>
+                            <th style="background-color: #b71c1c !important; color: #fff !important;">Путь</th>
+                            <th style="background-color: #b71c1c !important; color: #fff !important;">Теги</th>
+                            <th style="background-color: #b71c1c !important; color: #fff !important;">Описание</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        routes.forEach(route => {
+            const methods = (route.methods || []).join(', ');
+            const tags = (route.tags || []).join(', ') || '—';
+            // Формируем описание из summary и description
+            let descParts = [];
+            if (route.summary) descParts.push(route.summary);
+            if (route.description) descParts.push(route.description);
+            const description = descParts.join(' ') || '—';
+            html += `
+                <tr style="background-color: #b71c1c !important; color: #fff !important;">
+                    <td style="background-color: #b71c1c !important; color: #fff !important;">${methods}</td>
+                    <td style="background-color: #b71c1c !important; color: #fff !important;">
+                        <code style="background-color: #b71c1c !important; color: #fff !important; padding: 2px 4px; border-radius: 4px;">${route.path}</code>
+                    </td>
+                    <td style="background-color: #b71c1c !important; color: #fff !important;">${tags}</td>
+                    <td style="background-color: #b71c1c !important; color: #fff !important;">${description}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        routeCountSpan.textContent = `Найдено: ${routes.length}`;
+    }
+
+    function renderModels(models) {
+        const container = document.getElementById('modelsContainer');
+        if (!models || models.length === 0) {
+            container.innerHTML = '<p style="color: #ffd700 !important;">Нет моделей</p>';
+            return;
+        }
+        let html = '<div class="accordion" id="modelsAccordion">';
+        models.forEach((model, idx) => {
+            const id = `model-${idx}`;
+            html += `
+                <div class="accordion-item" style="background-color: #1a1a1a !important; border: 1px solid #ffd700 !important;">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${id}"
+                                style="background-color: #1a1a1a !important; color: #ffd700 !important;">
+                            ${model.name}
+                        </button>
+                    </h2>
+                    <div id="${id}" class="accordion-collapse collapse" data-bs-parent="#modelsAccordion">
+                        <div class="accordion-body" style="background-color: #1a1a1a !important; color: #ffd700 !important;">
+                            <p style="color: #ffd700 !important;"><strong>Первичный ключ:</strong> ${(model.primary_key || []).join(', ') || '—'}</p>
+                            <p style="color: #ffd700 !important;"><strong>Внешние ключи:</strong> ${(model.foreign_keys || []).map(fk => `${fk.column} → ${fk.ref_table}`).join('; ') || '—'}</p>
+                            <table class="table table-sm" style="background-color: #1a1a1a !important; color: #ffd700 !important;">
+                                <thead><tr><th>Колонка</th><th>Тип</th></tr></thead>
+                                <tbody>
+                                    ${(model.columns || []).map(col => `<tr><td>${col.name}</td><td>${col.type}</td></tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // Функция фильтрации маршрутов с учётом всех полей
+    function filterRoutes() {
+        const searchText = searchInput.value.toLowerCase().trim();
+        const method = methodFilter.value;
+
+        filteredRoutes = allRoutes.filter(route => {
+            // Поиск по всем полям
+            const path = (route.path || '').toLowerCase();
+            const methods = (route.methods || []).join(' ').toLowerCase();
+            const tags = (route.tags || []).join(' ').toLowerCase();
+            const name = (route.name || '').toLowerCase();
+            const summary = (route.summary || '').toLowerCase();
+            const description = (route.description || '').toLowerCase();
+            const combined = path + ' ' + methods + ' ' + tags + ' ' + name + ' ' + summary + ' ' + description;
+
+            const matchSearch = searchText === '' || combined.includes(searchText);
+
+            // Фильтр по методу
+            const matchMethod = method === 'all' || (route.methods || []).some(m => m.toUpperCase() === method);
+
+            return matchSearch && matchMethod;
+        });
+
+        renderRoutes(filteredRoutes);
+    }
+
+    // Загрузка данных с сервера
+    fetch('/api/v1/web_architecture/api/architecture')
+        .then(res => res.json())
+        .then(data => {
+            allApps = data.apps || [];
+            allRoutes = data.routes || [];
+            allModels = data.models || [];
+
+            renderApps(allApps);
+            filteredRoutes = allRoutes.slice();
+            renderRoutes(filteredRoutes);
+            renderModels(allModels);
+        })
+        .catch(err => {
+            console.error('Ошибка загрузки архитектуры:', err);
+            document.querySelectorAll('.accordion-body').forEach(el => {
+                el.innerHTML = '<div class="alert alert-danger" style="background-color: #dc3545 !important; color: #fff !important;">Ошибка загрузки данных</div>';
+            });
+        });
+
+    // Обработчики
+    searchInput.addEventListener('input', filterRoutes);
+    methodFilter.addEventListener('change', filterRoutes);
+    clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        methodFilter.value = 'all';
+        filterRoutes();
+    });
+});
+</script>
+{% endblock %}

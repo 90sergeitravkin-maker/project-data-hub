@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ page_title | default('Data Hub') }}{% endblock %}</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="{{ static('css/bootstrap.min.css') }}">
+    <!-- Кастомные стили -->
+    <link rel="stylesheet" href="{{ static('css/app_style.css') }}">
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Навигация -->
+    {% include 'partials/navbar.html' %}
+    <!-- Основной контент -->
+    <main class="container-fluid">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-5 py-3" style="background-color: #1a1a1a; border-top: 2px solid #ffd700;">
+        <div class="container-fluid text-center">
+            <p style="color: #ffd700; margin: 0;">
+                &copy; 2026 Data Hub |
+                <a href="/api/v1/system/health" style="color: #ffed4e;">System Status</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="{{ static('js/bootstrap.bundle.min.js') }}"></script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

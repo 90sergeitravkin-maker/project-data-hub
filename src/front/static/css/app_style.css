@@ -1,0 +1,556 @@
+/* src/front/static/css/app_style.css */
+
+/* === Палитра === */
+:root {
+    --bg-primary:   #000000;
+    --bg-secondary: #111111;
+    --bg-tertiary:  #1e1e1e;
+
+    --text-primary:   #ffd700;
+    --text-secondary: #e6c200;
+    --text-muted:     #aaaaaa;
+
+    --btn-default:       #ffd700;
+    --btn-default-hover: #ffed4e;
+    --btn-default-text:  #000000;
+
+    --btn-active:       #dc3545;
+    --btn-active-hover: #b02a37;
+    --btn-active-text:  #ffffff;
+
+    --border-color: #ffd700;
+    --link-color:   #ffd700;
+    --link-hover:   #ffed4e;
+
+    --danger:  #dc3545;
+    --success: #28a745;
+    --warning: #ffd700;
+}
+
+/* === Базовые цвета === */
+html, body {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* === Контейнеры и карточки === */
+.container, .container-fluid { background-color: var(--bg-primary); }
+
+.card {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.card-header {
+    background-color: var(--bg-tertiary) !important;
+    border-bottom: 2px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.card-footer {
+    background-color: var(--bg-tertiary) !important;
+    border-top: 1px solid var(--border-color) !important;
+}
+
+/* === Текст === */
+h1, h2, h3, h4, h5, h6, p, span, div, label, li {
+    color: var(--text-primary);
+}
+.text-muted {
+    color: var(--text-muted) !important;
+    opacity: 0.85;
+}
+.text-secondary-custom {
+    color: var(--text-secondary) !important;
+}
+
+/* === Ссылки === */
+a {
+    color: var(--link-color) !important;
+    text-decoration: none;
+}
+a:hover {
+    color: var(--link-hover) !important;
+    text-decoration: underline;
+}
+
+/* ============================================================
+   КНОПКИ
+   ============================================================ */
+.btn {
+    border-radius: 5px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background-color: var(--btn-default) !important;
+    border-color: var(--btn-default) !important;
+    color: var(--btn-default-text) !important;
+}
+.btn-primary:hover {
+    background-color: var(--btn-default-hover) !important;
+    border-color: var(--btn-default-hover) !important;
+    color: var(--btn-default-text) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3);
+}
+.btn-primary:active,
+.btn-primary.active,
+.btn-primary[aria-pressed="true"],
+.show > .btn-primary.dropdown-toggle {
+    background-color: var(--btn-active) !important;
+    border-color: var(--btn-active) !important;
+    color: var(--btn-active-text) !important;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.4);
+}
+.btn-primary:active:hover,
+.btn-primary.active:hover {
+    background-color: var(--btn-active-hover) !important;
+    border-color: var(--btn-active-hover) !important;
+    color: var(--btn-active-text) !important;
+}
+.btn-primary:focus,
+.btn-primary:focus-visible {
+    outline: 2px solid var(--btn-active) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.35) !important;
+}
+
+.btn-secondary,
+.btn-outline-warning {
+    background-color: transparent !important;
+    border: 2px solid var(--btn-default) !important;
+    color: var(--btn-default) !important;
+}
+.btn-secondary:hover,
+.btn-outline-warning:hover {
+    background-color: var(--btn-default) !important;
+    color: var(--btn-default-text) !important;
+}
+.btn-secondary:active,
+.btn-secondary.active,
+.btn-outline-warning:active,
+.btn-outline-warning.active {
+    background-color: var(--btn-active) !important;
+    border-color: var(--btn-active) !important;
+    color: var(--btn-active-text) !important;
+}
+
+.btn-success {
+    background-color: var(--success) !important;
+    border-color: var(--success) !important;
+    color: #fff !important;
+}
+.btn-success:hover { background-color: #1e7e34 !important; border-color: #1e7e34 !important; }
+
+.btn-danger {
+    background-color: var(--danger) !important;
+    border-color: var(--danger) !important;
+    color: #fff !important;
+}
+.btn-danger:hover { background-color: var(--btn-active-hover) !important; border-color: var(--btn-active-hover) !important; }
+
+.btn-warning {
+    background-color: var(--btn-default) !important;
+    border-color: var(--btn-default) !important;
+    color: var(--btn-default-text) !important;
+}
+.btn-warning:hover { background-color: var(--btn-default-hover) !important; }
+.btn-warning:active, .btn-warning.active {
+    background-color: var(--btn-active) !important;
+    border-color: var(--btn-active) !important;
+    color: var(--btn-active-text) !important;
+}
+
+/* ============================================================
+   ФОРМЫ
+   ============================================================ */
+.form-control, .form-select {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.form-control:focus, .form-select:focus {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--btn-default-hover) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 0 0 0.2rem rgba(255, 215, 0, 0.25) !important;
+}
+.form-control::placeholder {
+    color: var(--text-secondary) !important;
+    opacity: 0.6;
+}
+.form-label {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+}
+.form-select option {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* ============================================================
+   ТАБЛИЦЫ
+   ============================================================ */
+.table {
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+.table thead {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+}
+.table thead th {
+    border-bottom: 2px solid var(--border-color) !important;
+}
+.table tbody tr {
+    background-color: var(--bg-secondary) !important;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.15) !important;
+}
+.table tbody tr:hover {
+    background-color: var(--bg-tertiary) !important;
+}
+.table-striped tbody tr:nth-of-type(odd)  { background-color: var(--bg-secondary) !important; }
+.table-striped tbody tr:nth-of-type(even) { background-color: var(--bg-tertiary) !important; }
+.table td, .table th { color: var(--text-primary) !important; }
+
+/* ============================================================
+   НАВИГАЦИЯ
+   ============================================================ */
+.navbar {
+    background-color: var(--bg-secondary) !important;
+    border-bottom: 2px solid var(--border-color) !important;
+}
+.navbar-brand, .nav-link {
+    color: var(--text-primary) !important;
+}
+.nav-link:hover { color: var(--link-hover) !important; }
+.nav-link.active {
+    color: var(--btn-active) !important;
+    font-weight: 700;
+    border-bottom: 2px solid var(--btn-active) !important;
+}
+
+.nav-tabs { border-bottom: 2px solid var(--border-color) !important; }
+.nav-tabs .nav-link {
+    color: var(--text-primary) !important;
+    border: 1px solid transparent;
+}
+.nav-tabs .nav-link:hover { border-color: var(--border-color) !important; }
+.nav-tabs .nav-link.active {
+    background-color: var(--btn-active) !important;
+    border-color: var(--btn-active) !important;
+    color: var(--btn-active-text) !important;
+}
+
+/* ============================================================
+   ХЛЕБНЫЕ КРОШКИ
+   ============================================================ */
+.breadcrumb {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 5px;
+    padding: 0.6rem 1rem;
+}
+.breadcrumb-item a { color: var(--link-color) !important; }
+.breadcrumb-item a:hover { color: var(--link-hover) !important; }
+.breadcrumb-item.active {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+}
+.breadcrumb-item + .breadcrumb-item::before {
+    color: var(--text-secondary) !important;
+}
+
+/* ============================================================
+   ПАГИНАЦИЯ
+   ============================================================ */
+.pagination .page-link {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.pagination .page-link:hover {
+    background-color: var(--btn-default) !important;
+    border-color: var(--btn-default) !important;
+    color: var(--btn-default-text) !important;
+}
+.pagination .page-item.active .page-link {
+    background-color: var(--btn-active) !important;
+    border-color: var(--btn-active) !important;
+    color: var(--btn-active-text) !important;
+    font-weight: 700;
+    z-index: 3;
+}
+.pagination .page-item.disabled .page-link {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    opacity: 0.5;
+}
+
+/* ============================================================
+   ALERTS
+   ============================================================ */
+.alert {
+    border-radius: 5px;
+    border-width: 2px;
+}
+.alert-primary {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.alert-success {
+    background-color: #0d2818 !important;
+    border-color: var(--success) !important;
+    color: #75e6a3 !important;
+}
+.alert-danger {
+    background-color: #2d0a0f !important;
+    border-color: var(--danger) !important;
+    color: #ff8a95 !important;
+}
+.alert-warning {
+    background-color: #2d2400 !important;
+    border-color: var(--warning) !important;
+    color: var(--text-primary) !important;
+}
+.alert-info {
+    background-color: #002d2d !important;
+    border-color: #00ffff !important;
+    color: #80ffff !important;
+}
+
+/* ============================================================
+   BADGES
+   ============================================================ */
+.badge { font-weight: 600; }
+.badge.bg-warning {
+    background-color: var(--btn-default) !important;
+    color: var(--btn-default-text) !important;
+}
+.badge.bg-danger {
+    background-color: var(--btn-active) !important;
+    color: var(--btn-active-text) !important;
+}
+.badge.bg-success {
+    background-color: var(--success) !important;
+    color: #fff !important;
+}
+.badge.bg-primary {
+    background-color: var(--btn-default) !important;
+    color: var(--btn-default-text) !important;
+}
+
+/* ============================================================
+   DROPDOWN / MODAL
+   ============================================================ */
+.dropdown-menu {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+}
+.dropdown-item { color: var(--text-primary) !important; }
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: var(--btn-default) !important;
+    color: var(--btn-default-text) !important;
+}
+.dropdown-item.active, .dropdown-item:active {
+    background-color: var(--btn-active) !important;
+    color: var(--btn-active-text) !important;
+}
+
+.modal-content {
+    background-color: var(--bg-secondary) !important;
+    border: 2px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.modal-header { border-bottom: 2px solid var(--border-color) !important; }
+.modal-footer { border-top: 2px solid var(--border-color) !important; }
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--btn-default); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--btn-default-hover); }
+
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
+.hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(255, 215, 0, 0.2);
+}
+
+.bg-warning { background-color: var(--btn-default) !important; color: var(--btn-default-text) !important; }
+.text-warning { color: var(--text-primary) !important; }
+
+/* ============================================================
+   УРОВНИ ЛОГОВ (цвета из colorlog)
+   ============================================================ */
+.lvl-debug {
+    color: #00ffff !important;
+    font-weight: 500;
+}
+.lvl-info {
+    color: #00ff00 !important;
+    font-weight: 500;
+}
+.lvl-warn {
+    color: #ffff00 !important;
+    font-weight: 600;
+}
+.lvl-error {
+    color: #ff4444 !important;
+    font-weight: 700;
+}
+.lvl-crit {
+    color: #ff0000 !important;
+    font-weight: 900;
+    text-shadow: 0 0 4px rgba(255, 0, 0, 0.6);
+    background-color: rgba(255, 0, 0, 0.08);
+}
+.lvl-raw {
+    color: #aaaaaa !important;
+    font-style: italic;
+}
+/* ============================================================
+   СВЕТЛАЯ ТЕМА (автоматически, если ОС в светлом режиме)
+   ============================================================ */
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-primary:   #ffffff;
+        --bg-secondary: #f5f5f5;
+        --bg-tertiary:  #e9ecef;
+
+        --text-primary:   #000000;
+        --text-secondary: #333333;
+        --text-muted:     #6c757d;
+
+        --border-color: #000000;
+        --link-color:   #000000;
+        --link-hover:   #333333;
+
+        --btn-default:       #000000;
+        --btn-default-hover: #333333;
+        --btn-default-text:  #ffffff;
+
+        --btn-active:       #dc3545;
+        --btn-active-hover: #b02a37;
+        --btn-active-text:  #ffffff;
+    }
+
+    /* Переопределяем элементы, которые могли остаться тёмными */
+    html, body {
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .card, .card-header, .card-footer {
+        background-color: var(--bg-secondary) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .table {
+        color: var(--text-primary) !important;
+        border-color: var(--border-color) !important;
+    }
+    .table thead {
+        background-color: var(--bg-tertiary) !important;
+        color: var(--text-primary) !important;
+    }
+    .table tbody tr {
+        background-color: var(--bg-secondary) !important;
+    }
+    .table tbody tr:hover {
+        background-color: var(--bg-tertiary) !important;
+    }
+
+    .navbar {
+        background-color: var(--bg-secondary) !important;
+        border-bottom-color: var(--border-color) !important;
+    }
+    .navbar-brand, .nav-link {
+        color: var(--text-primary) !important;
+    }
+
+    .form-control, .form-select {
+        background-color: var(--bg-tertiary) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .breadcrumb {
+        background-color: var(--bg-secondary) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    .pagination .page-link {
+        background-color: var(--bg-secondary) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-primary) !important;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: var(--btn-active) !important;
+        border-color: var(--btn-active) !important;
+        color: var(--btn-active-text) !important;
+    }
+
+    /* Алерты – переопределяем на светлые варианты */
+    .alert-primary {
+        background-color: #d1ecf1 !important;
+        border-color: #bee5eb !important;
+        color: #0c5460 !important;
+    }
+    .alert-success {
+        background-color: #d4edda !important;
+        border-color: #c3e6cb !important;
+        color: #155724 !important;
+    }
+    .alert-danger {
+        background-color: #f8d7da !important;
+        border-color: #f5c6cb !important;
+        color: #721c24 !important;
+    }
+    .alert-warning {
+        background-color: #fff3cd !important;
+        border-color: #ffeeba !important;
+        color: #856404 !important;
+    }
+    .alert-info {
+        background-color: #d1ecf1 !important;
+        border-color: #bee5eb !important;
+        color: #0c5460 !important;
+    }
+
+    /* Цвета уровней логов – сделать контрастными на светлом фоне */
+    .lvl-debug { color: #005f5f !important; }
+    .lvl-info  { color: #005f00 !important; }
+    .lvl-warn  { color: #7f5f00 !important; }
+    .lvl-error { color: #cc0000 !important; }
+    .lvl-crit  { color: #b30000 !important; background-color: rgba(255, 0, 0, 0.08); }
+    .lvl-raw   { color: #333333 !important; }
+
+    .badge-lvl-debug { background-color: #00ffff !important; color: #000 !important; }
+    .badge-lvl-info  { background-color: #00ff00 !important; color: #000 !important; }
+    .badge-lvl-warn  { background-color: #ffff00 !important; color: #000 !important; }
+    .badge-lvl-error { background-color: #ff4444 !important; color: #fff !important; }
+    .badge-lvl-crit  { background-color: #ff0000 !important; color: #fff !important; }
+}
+/* Бейджи уровней логов */
+.badge-lvl-debug { background-color: #00ffff !important; color: #000 !important; }
+.badge-lvl-info  { background-color: #00ff00 !important; color: #000 !important; }
+.badge-lvl-warn  { background-color: #ffff00 !important; color: #000 !important; }
+.badge-lvl-error { background-color: #ff4444 !important; color: #fff !important; }
+.badge-lvl-crit  { background-color: #ff0000 !important; color: #fff !important; font-weight: 900; }
+

@@ -1,0 +1,21 @@
+{
+  "WEB-ASEANSTAT-WORLD_TRADE-1": [
+    "year","reporter_code"
+  ]
+  ,"API-COMTRADE-WORLD_TRADE-1": [
+    "reporter_code",
+    "period",
+    "dataset_checksum"
+  ]
+  ,"WEB-CUSTOMS_CHN-WORLD_TRADE-1": [
+    "period",
+    "trading_partner_code",
+    "locations_of_importers_and_exporters_code"
+  ]
+  ,"API-MACMAP-TARIFFS-1": [
+    "reporter_code", "year"
+  ]
+  ,"API-MACMAP-MEASURES-1": [
+    "reporter_code", "ntm_year"
+  ]
+}

@@ -1,0 +1,191 @@
+<!-- src/front/templates/web_file_manager/preview.html -->
+{% extends "base.html" %}
+
+{% block title %}Просмотр файла — Data Hub{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static('css/web_file_manager.css') }}">
+<style>
+    .preview-table {
+        font-family: 'Consolas', monospace;
+        font-size: 0.85rem;
+    }
+    .preview-table th {
+        background-color: var(--bg-tertiary) !important;
+        color: var(--text-primary) !important;
+        border-bottom: 2px solid var(--border-color) !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .preview-table td {
+        vertical-align: top;
+        padding: 4px 8px !important;
+        border-bottom: 1px solid rgba(255, 215, 0, 0.15) !important;
+        word-break: break-word;
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .preview-container {
+        max-height: 70vh;
+        overflow: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 5px;
+    }
+    .filter-form {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{{ api_prefix }}/test?root={{ current_root }}">🏠 {{ root_label }}</a>
+            </li>
+            {% for part in breadcrumb_parts %}
+                {% if not loop.last %}
+                    <li class="breadcrumb-item">
+                        <span>{{ part }}</span>
+                    </li>
+                {% else %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ part }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </nav>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">📄 Просмотр файла</h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <strong>Файл:</strong> <code style="color: var(--text-primary);">{{ file_path }}</code>
+                </div>
+                <div class="col-md-2">
+                    <strong>Тип:</strong> <span class="badge bg-warning">{{ file_type }}</span>
+                </div>
+                <div class="col-md-2">
+                    <strong>Строк:</strong> {{ total_rows }}
+                </div>
+            </div>
+
+            <form method="GET" action="{{ api_prefix }}/preview" class="filter-form">
+                <input type="hidden" name="root" value="{{ current_root }}">
+                <input type="hidden" name="file_path" value="{{ file_path }}">
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">На странице</label>
+                        <select name="page_size" class="form-select">
+                            <option value="50"  {% if page_size == 50  %}selected{% endif %}>50</option>
+                            <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                            <option value="200" {% if page_size == 200 %}selected{% endif %}>200</option>
+                        </select>
+                    </div>
+
+                    {% for col in columns[:5] %}
+                    <div class="col-md-2">
+                        <label class="form-label">{{ col }}</label>
+                        <input type="text" name="{{ col }}" class="form-control"
+                               placeholder="Фильтр..." value="">
+                    </div>
+                    {% endfor %}
+
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-primary w-100">🔍</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>📊 Данные ({{ total_rows }} строк)</span>
+            <span class="badge bg-warning">
+                Стр. {{ pagination.current_page }} / {{ pagination.total_pages }}
+            </span>
+        </div>
+
+        <div class="card-body p-0">
+            {% if rows %}
+                <div class="preview-container">
+                    <table class="table preview-table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                {% for col in columns %}
+                                    <th>{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in rows %}
+                                <tr>
+                                    {% for col in columns %}
+                                        <td>{{ row.data[col] if row.data[col] is not none else '' }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-warning text-center mb-0">
+                    <h5>📭 Нет данных</h5>
+                    <p class="mb-0">Файл пуст или не содержит данных для отображения</p>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if pagination.total_pages > 1 %}
+            <div class="card-footer">
+                <nav aria-label="Навигация по страницам">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if pagination.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                   href="{{ api_prefix }}/preview?{{ pagination.query_params }}&page={{ pagination.current_page - 1 }}">
+                                    ← Назад
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">← Назад</span></li>
+                        {% endif %}
+
+                        {% for page_num in pagination.page_range %}
+                            <li class="page-item {% if page_num == pagination.current_page %}active{% endif %}">
+                                <a class="page-link"
+                                   href="{{ api_prefix }}/preview?{{ pagination.query_params }}&page={{ page_num }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                        {% endfor %}
+
+                        {% if pagination.has_next %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                   href="{{ api_prefix }}/preview?{{ pagination.query_params }}&page={{ pagination.current_page + 1 }}">
+                                    Вперёд →
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">Вперёд →</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
