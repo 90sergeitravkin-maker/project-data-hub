@@ -7,7 +7,7 @@ import time
 from typing import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from core.logger import logger
+from src.core.logger import logger
 from src.back.app_monitor.services import MemoryMonitorService
 
 # Маппинг префиксов → app_name (заполняется при старте)

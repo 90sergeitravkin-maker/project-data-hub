@@ -4,9 +4,11 @@
 """
 
 import os
+
 from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import SecretStr
+
 from src.core.secrets import SecureString
 
 # Определяем путь к .env (корень проекта)

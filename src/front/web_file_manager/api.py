@@ -59,7 +59,7 @@ async def page_view(
 ) -> HTMLResponse:
     # === Если root не задан — показываем страницу выбора корня ===
     if root is None:
-        logger.info("[WEB_FILE_MANAGER/TEST]11111111111111111111111111111111111111111111111 Запрос: выбор корня")
+        logger.info("[WEB_FILE_MANAGER/TEST] Запрос: выбор корня")
         return templates.TemplateResponse(
             name="web_file_manager/test.html",
             request=request,

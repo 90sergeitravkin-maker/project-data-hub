@@ -1,8 +1,15 @@
 # src/main.py
+import sys
 import asyncio
 
 from pathlib import Path
+from pathlib import Path
 from contextlib import asynccontextmanager
+
+# Добавляем корень проекта в sys.path
+root_dir = Path(__file__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,10 +21,10 @@ SRC_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SRC_DIR.parent
 
 # Импорт настроек и зависимостей
+from src.api import router as system_router, include_app_routers, openapi_tags
 from src.core.logger import config_logging, logger
 from src.core.kafka import kafka_client
 from src.core.env_loader import get_env
-from src.api import router as system_router, include_app_routers, openapi_tags
 from src.back.app_ecomru.services import handle_download_task, handle_verification_task
 from src.back.app_ecomru.config import (
     ensure_storage_ready,

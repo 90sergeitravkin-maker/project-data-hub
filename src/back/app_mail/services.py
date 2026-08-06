@@ -1,7 +1,7 @@
 import uuid
 from typing import Dict, Any, Optional
 
-from core.logger import logger
+from src.core.logger import logger
 from src.back.app_mail.config import DB_ALIAS
 from src.database.manager import DBManager
 

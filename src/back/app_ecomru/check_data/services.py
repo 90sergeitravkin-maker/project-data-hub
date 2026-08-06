@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from core.logger import logger
+from src.core.logger import logger
 from src.back.app_ecomru.config import DATA_FILE_RAW, DATA_FILE_TEMP, ALLOWED_PREFIXES
 from src.back.app_ecomru.check_data.file_manager import DuckDBFileManager
 

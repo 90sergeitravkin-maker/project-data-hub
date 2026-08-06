@@ -6,7 +6,7 @@ import duckdb
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Generator
 
-from core.logger import logger
+from src.core.logger import logger
 from src.back.app_ecomru.config import DATA_FILE_RAW, DATA_FILE_TEMP, MAX_FILE_SIZE
 
 

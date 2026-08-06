@@ -1,5 +1,5 @@
 # src/back/app_link/api.py
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from src.back.app_link.config import TAG_NAME
 from src.back.app_link.services import Link
@@ -8,6 +8,7 @@ from src.back.app_link.schemas import (
     LinkExistsItem,
     LinkExistsResponse, LinkExistsRequest,
     LinksExistsRequest,
+    LinkStatus,
 )
 
 router = APIRouter(tags=[TAG_NAME])
@@ -21,6 +22,18 @@ async def check_single_link(request: LinkExistsRequest) -> LinkExistsItem:
     raw = str(request.url)
     exists = await Link.exists(raw)
     return LinkExistsItem(url=raw, exists=exists)
+
+
+@router.post("/add-url", response_model=LinkStatus, summary="Добавить одну ссылку")
+async def add_url(request: LinkExistsRequest):
+    """
+    Принимает один URL, сохраняет его (если новый) и возвращает статус.
+    """
+    raw = str(request.url)
+    response = await Link.process_links([raw])
+    if response.results:
+        return response.results[0]
+    raise HTTPException(status_code=500, detail="Failed to process link")
 
 
 @router.post("/exists_many", response_model=LinkExistsResponse)

@@ -9,8 +9,8 @@ config = AppConfig.from_app_name(
 )
 
 # Специфичные параметры
-CHECK_DATA_URL = get_env("CHECK_DATA_ENDPOINT", "http://localhost:8000/api/v1/systems/check-data")
-CHECK_TIMEOUT = int(get_env("CHECK_DATA_TIMEOUT", "30"))
+CHECK_DATA_URL      = get_env("CHECK_DATA_ENDPOINT", "http://localhost:8000/api/v1/systems/check-data")
+CHECK_TIMEOUT       = int(get_env("CHECK_DATA_TIMEOUT", "30"))
 CHECK_SERVICE_TOKEN = get_env("APP_SYSTEMS_TOKEN", "").split(',')[0] if get_env("APP_SYSTEMS_TOKEN") else ""
 
 # Экспорт базовых переменных для обратной совместимости

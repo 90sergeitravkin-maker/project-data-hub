@@ -9,8 +9,8 @@ from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.structs import OffsetAndMetadata
 
-from core.env_loader import get_env
-from core.logger import logger
+from src.core.env_loader import get_env
+from src.core.logger import logger
 
 BOOTSTRAP = get_env("KAFKA_BOOTSTRAP", "localhost:9092")
 REQUEST_TIMEOUT = int(get_env("KAFKA_REQUEST_TIMEOUT_MS", "10000"))

@@ -7,6 +7,7 @@ Web-интерфейс мониторинга ресурсов.
 from typing import Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+
 from src.front.web_monitor.config import templates, TAG_NAME
 from src.front.web_monitor.services import WebMonitorService
 

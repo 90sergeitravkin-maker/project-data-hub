@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Any
 import psutil
 from fastapi import HTTPException, status
 
-from core.logger import logger
+from src.core.logger import logger
 from src.database.manager import DBManager
 from src.back.app_monitor.config import (
     DB_ALIAS, RAM_WARNING_MB, RAM_CRITICAL_MB,

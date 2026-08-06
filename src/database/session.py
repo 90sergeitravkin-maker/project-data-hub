@@ -1,8 +1,10 @@
 # src/database/session.py
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from src.core.db_config import to_asyncpg_url  # ← Импортируем из core
-from core.logger import logger
+
+from src.core.logger import logger
+from src.core.db_config import to_asyncpg_url
+
 
 _engines = {}
 _factories = {}

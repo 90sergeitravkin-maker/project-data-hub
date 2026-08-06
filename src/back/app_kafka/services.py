@@ -3,9 +3,9 @@ from typing import List, Dict, Any, Optional
 
 from fastapi import HTTPException, status
 
-from core.logger import logger
-from core.kafka import kafka_client
-from core import kafka_admin
+from src.core.logger import logger
+from src.core.kafka import kafka_client
+from src.core import kafka_admin
 from src.back.app_kafka.schemas import ProduceResponse
 
 

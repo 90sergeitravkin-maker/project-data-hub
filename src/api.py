@@ -6,7 +6,7 @@ API роутеры для общего сервиса.
 from typing import List, Dict
 from fastapi import APIRouter, status
 
-from core.logger import logger
+from src.core.logger import logger
 
 # === Глобальный список OpenAPI tags ===
 openapi_tags: List[Dict[str, str]] = [

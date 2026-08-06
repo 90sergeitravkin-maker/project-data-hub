@@ -47,7 +47,10 @@ try:
 except ValueError as e:
     raise ValueError(f"Не удалось получить DSN для миграций: {e}")
 
+db_url = db_url.replace("%", "%%")# если в пароле есть % то их требуется экранировать
+
 config.set_main_option("sqlalchemy.url", db_url)
+
 
 # Metadata для autogenerate
 target_metadata = Base.metadata

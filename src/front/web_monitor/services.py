@@ -5,7 +5,7 @@
 """
 import httpx
 from typing import Optional, Dict, Any
-from core.logger import logger
+from src.core.logger import logger
 
 MONITOR_API_BASE = "http://127.0.0.1:8081/api/v1/app_monitor"
 

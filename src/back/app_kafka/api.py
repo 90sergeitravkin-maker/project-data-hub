@@ -2,13 +2,14 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, status
 
+from src.core.logger import logger
+from src.back.app_kafka.services import kafka_service
 from src.back.app_kafka.config import TAG_NAME
 from src.back.app_kafka.schemas import (
     TopicInfo, GroupInfo, GroupDetailResponse,
     ProduceRequest, ProduceResponse,
 )
-from src.back.app_kafka.services import kafka_service
-from src.core.logger import logger
+
 
 router = APIRouter(tags=[TAG_NAME])
 

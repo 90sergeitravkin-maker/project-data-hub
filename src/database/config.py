@@ -10,7 +10,7 @@ from src.core.db_config import (
     to_asyncpg_url,
 )
 from src.core.secrets import SecureDSN
-from core.logger import logger
+from src.core.logger import logger
 
 
 class DBConfig:

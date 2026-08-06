@@ -11,7 +11,7 @@ import asyncpg
 import psycopg2
 from contextlib import asynccontextmanager, contextmanager
 from typing import Optional, Dict, Any, List, AsyncGenerator, TypeVar
-from core.logger import logger
+from src.core.logger import logger
 from src.database.config import DBConfig
 from src.core.type_unifier import SchemaComparator
 

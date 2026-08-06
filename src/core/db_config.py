@@ -3,7 +3,8 @@
 Централизованная конфигурация подключений к базам данных.
 ЕДИНСТВЕННЫЙ источник истины для алиасов БД.
 """
-from typing import Dict, Optional
+from typing import Dict
+
 from src.core.env_loader import get_env
 from src.core.secrets import SecureDSN
 

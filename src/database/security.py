@@ -3,7 +3,7 @@ import re
 import os
 
 from typing import Optional
-from core.logger import logger
+from src.core.logger import logger
 
 
 class SecureDSN:

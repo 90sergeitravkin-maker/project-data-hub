@@ -3,7 +3,7 @@ import smtplib
 from email.mime.text import MIMEText
 from typing import Dict, Any
 
-from core.logger import logger
+from src.core.logger import logger
 from src.back.app_mail.config import (
     FROM_EMAIL, 
     APP_PASSWORD, 

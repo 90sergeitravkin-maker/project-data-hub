@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, HTTPException, status
-from core.logger import logger
+from src.core.logger import logger
 from src.back.app_mail.config import TAG_NAME
 from src.back.app_mail.schemas import MailCreateRequest, TaskResponse, TaskStatusResponse
 from src.back.app_mail.services import MailTracker

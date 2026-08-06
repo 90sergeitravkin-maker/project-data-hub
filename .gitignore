@@ -45,3 +45,5 @@ wheels/
 *.log
 .DS_Store
 Thumbs.db
+/packages-microsoft-prod.deb
+/logs/

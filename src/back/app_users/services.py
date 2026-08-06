@@ -7,8 +7,9 @@
 import uuid
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException, status
+
+from src.core.logger import logger
 from src.database.manager import DBManager
-from core.logger import logger
 from src.back.app_users.config import config
 from src.back.app_users.schemas import (
     RegisterRequest, LoginRequest, LoginStatsQuery

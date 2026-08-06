@@ -4,8 +4,10 @@
 Переиспользуется всеми приложениями проекта.
 """
 import re
+
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Set, Optional
+
 from src.core.logger import logger
 
 

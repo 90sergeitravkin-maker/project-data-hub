@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from core.logger import logger
+from src.core.logger import logger
 
 # Загрузка .env из корня проекта
 _env_path = Path(__file__).resolve().parents[3] / ".env"
