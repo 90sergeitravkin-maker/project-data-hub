@@ -4,11 +4,10 @@
 Возвращает все топики и группы без фильтрации.
 """
 
-import logging
 from typing import List, Dict, Any, Optional
-
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from aiokafka.structs import TopicPartition as KafkaTopicPartition
 
 from src.core.env_loader import get_env
 from src.core.logger import logger
@@ -18,7 +17,6 @@ REQUEST_TIMEOUT = int(get_env("KAFKA_REQUEST_TIMEOUT_MS", "10000"))
 
 
 async def get_admin_client() -> AIOKafkaAdminClient:
-    """Создаёт и возвращает административный клиент Kafka."""
     return AIOKafkaAdminClient(
         bootstrap_servers=BOOTSTRAP,
         request_timeout_ms=REQUEST_TIMEOUT,
@@ -26,7 +24,6 @@ async def get_admin_client() -> AIOKafkaAdminClient:
 
 
 async def topic_exists(topic_name: str) -> bool:
-    """Проверяет существование топика."""
     admin = await get_admin_client()
     try:
         await admin.start()
@@ -40,14 +37,6 @@ async def topic_exists(topic_name: str) -> bool:
 
 
 async def ensure_topics(topics: List[str], partitions: int = 1, replication: int = 1) -> None:
-    """
-    Создаёт указанные топики, если они ещё не существуют.
-
-    Args:
-        topics: Список имён топиков.
-        partitions: Количество партиций (по умолчанию 1).
-        replication: Коэффициент репликации (по умолчанию 1).
-    """
     admin = await get_admin_client()
     try:
         await admin.start()
@@ -68,37 +57,46 @@ async def ensure_topics(topics: List[str], partitions: int = 1, replication: int
 async def list_topics() -> List[Dict[str, Any]]:
     """
     Возвращает список всех неслужебных топиков с информацией о партициях.
-
-    Использует внутренний кластерный метаданные, чтобы избежать ошибок
-    при работе с разными версиями aiokafka.
-
-    Returns:
-        Список словарей с ключами: name, partitions, configs, description.
+    Использует describe_topics для получения деталей, обрабатывая как словари, так и объекты.
     """
     admin = await get_admin_client()
     try:
         await admin.start()
-        cluster = admin._client.cluster
-        all_topics = cluster.topics()  # множество всех топиков
+        all_topics = await admin.list_topics()
+        logger.debug(f"[KAFKA_ADMIN] Все топики: {all_topics}")
+
+        topics_to_describe = [t for t in all_topics if not t.startswith("__")]
+        descriptions = await admin.describe_topics(topics=topics_to_describe)
 
         result = []
-        for topic in all_topics:
-            if topic.startswith("__"):          # пропускаем служебные
-                continue
+        for desc in descriptions:
+            # desc может быть словарём или объектом
+            if isinstance(desc, dict):
+                topic_name = desc.get("topic")
+                partitions_raw = desc.get("partitions", [])
+            else:
+                topic_name = desc.topic
+                partitions_raw = desc.partitions
 
             partitions = []
-            topic_partitions = cluster.partitions_for_topic(topic) or []
-            for p in topic_partitions:
-                tp = TopicPartition(topic, p)
-                partitions.append({
-                    "partition": p,
-                    "leader": cluster.leader_for_partition(tp),
-                    "replicas": list(cluster.replicas_for_partition(tp) or []),
-                    "isr": list(cluster.isr_for_partition(tp) or []),
-                })
+            for p in partitions_raw:
+                if isinstance(p, dict):
+                    partitions.append({
+                        "partition": p.get("partition"),
+                        "leader": p.get("leader"),
+                        "replicas": p.get("replicas", []),
+                        "isr": p.get("isr", []),
+                    })
+                else:
+                    partitions.append({
+                        "partition": p.partition,
+                        "leader": p.leader,
+                        "replicas": p.replicas,
+                        "isr": p.isr,
+                    })
 
             result.append({
-                "name": topic,
+                "name": topic_name,
                 "partitions": partitions,
                 "configs": {},
                 "description": None,
@@ -117,12 +115,7 @@ async def list_topics() -> List[Dict[str, Any]]:
 async def list_groups() -> List[Dict[str, Any]]:
     """
     Возвращает список всех consumer groups с деталями.
-
-    Поддерживает как строки, так и кортежи (group_id, protocol_type),
-    возвращаемые разными версиями aiokafka.
-
-    Returns:
-        Список словарей с ключами: group_id, protocol_type, state, members.
+    Обрабатывает как строки, так и кортежи (group_id, protocol_type).
     """
     admin = await get_admin_client()
     try:
@@ -132,27 +125,40 @@ async def list_groups() -> List[Dict[str, Any]]:
 
         result = []
         for group in raw_groups:
-            # Извлекаем group_id из кортежа или строки
             if isinstance(group, tuple):
                 group_id = group[0]
             else:
                 group_id = group
 
             try:
-                desc = await admin.describe_consumer_groups([group_id])
-                group_desc = desc[group_id]
+                # describe_consumer_groups возвращает словарь {group_id: описание}
+                desc_dict = await admin.describe_consumer_groups([group_id])
+                group_desc = desc_dict.get(group_id)
+                if group_desc is None:
+                    raise ValueError(f"Нет описания для группы {group_id}")
+
+                # group_desc может быть объектом или словарём
+                if isinstance(group_desc, dict):
+                    members_raw = group_desc.get("members", [])
+                    protocol_type = group_desc.get("protocol_type", "unknown")
+                    state = group_desc.get("state", "unknown")
+                else:
+                    members_raw = group_desc.members
+                    protocol_type = group_desc.protocol_type
+                    state = group_desc.state
+
                 members = [
                     {
-                        "member_id": m.member_id,
-                        "client_id": m.client_id,
-                        "host": m.client_host,
+                        "member_id": m.member_id if not isinstance(m, dict) else m.get("member_id"),
+                        "client_id": m.client_id if not isinstance(m, dict) else m.get("client_id"),
+                        "host": m.host if not isinstance(m, dict) else m.get("host"),
                     }
-                    for m in group_desc.members
+                    for m in members_raw
                 ]
                 result.append({
                     "group_id": group_id,
-                    "protocol_type": group_desc.protocol_type,
-                    "state": group_desc.state,
+                    "protocol_type": protocol_type,
+                    "state": state,
                     "members": members,
                 })
             except Exception as e:
@@ -175,15 +181,6 @@ async def list_groups() -> List[Dict[str, Any]]:
 
 
 async def get_group_lags(group_id: str) -> List[Dict[str, Any]]:
-    """
-    Вычисляет lag (отставание) для каждой партиции указанной consumer group.
-
-    Args:
-        group_id: Идентификатор группы потребителей.
-
-    Returns:
-        Список словарей с информацией о lag для каждой партиции.
-    """
     admin = await get_admin_client()
     consumer: Optional[AIOKafkaConsumer] = None
     try:

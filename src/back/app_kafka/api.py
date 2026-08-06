@@ -10,11 +10,13 @@ from src.back.app_kafka.schemas import (
     ProduceRequest, ProduceResponse,
 )
 
-
 router = APIRouter(tags=[TAG_NAME])
 
 
-@router.get("/health", summary="Проверка подключения к Kafka")
+@router.get(
+    "/health",
+    summary="Проверка подключения к Kafka"
+)
 async def kafka_health():
     result = await kafka_service.async_check_connection()
     if not result.get("available"):
@@ -22,7 +24,11 @@ async def kafka_health():
     return result
 
 
-@router.get("/topics", response_model=List[TopicInfo], summary="Список всех топиков")
+@router.get(
+    "/topics",
+    response_model=List[TopicInfo],
+    summary="Список всех топиков"
+)
 async def list_topics():
     try:
         return await kafka_service.async_list_topics()
@@ -31,7 +37,11 @@ async def list_topics():
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@router.get("/groups", response_model=List[GroupInfo], summary="Consumer groups")
+@router.get(
+    "/groups",
+    response_model=List[GroupInfo],
+    summary="Consumer groups"
+)
 async def list_groups():
     try:
         return await kafka_service.async_list_groups()
@@ -40,21 +50,25 @@ async def list_groups():
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@router.get("/groups/{group_id}", response_model=GroupDetailResponse,
-            summary="Детали группы + lag")
+@router.get(
+    "/groups/{group_id}",
+    response_model=GroupDetailResponse,
+    summary="Детали группы + lag"
+)
 async def get_group_details(group_id: str):
     try:
         groups = await kafka_service.async_list_groups()
-        group_info = next((g for g in groups if g.group_id == group_id), None)
+        # groups – список словарей
+        group_info = next((g for g in groups if g["group_id"] == group_id), None)
         if not group_info:
             raise HTTPException(status.HTTP_404_NOT_FOUND,
                                 detail=f"Группа {group_id} не найдена")
         lags = await kafka_service.async_get_group_lags(group_id)
         return GroupDetailResponse(
-            group_id=group_info.group_id,
-            state=group_info.state,
-            protocol_type=group_info.protocol_type,
-            members=group_info.members,
+            group_id=group_info["group_id"],
+            state=group_info["state"],
+            protocol_type=group_info["protocol_type"],
+            members=group_info["members"],
             lags=lags,
         )
     except HTTPException:
@@ -64,8 +78,12 @@ async def get_group_details(group_id: str):
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@router.post("/produce", response_model=ProduceResponse,
-             status_code=status.HTTP_201_CREATED, summary="Отправить сообщение")
+@router.post(
+    "/produce",
+    response_model=ProduceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Отправить сообщение"
+)
 async def produce_message(request: ProduceRequest):
     try:
         return await kafka_service.produce_message(
