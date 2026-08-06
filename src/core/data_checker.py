@@ -1,210 +1,177 @@
-# src/core/kafka_admin.py
+# src/core/data_checker.py
 """
-Асинхронное администрирование Kafka через aiokafka.
-Возвращает все топики и группы без фильтрации.
+Общий сервис проверки наличия данных и извлечения дат.
+Переиспользуется всеми приложениями проекта.
 """
-import logging
-from typing import List, Dict, Any, Optional
+import re
 
-from aiokafka.admin import AIOKafkaAdminClient, NewTopic
-from aiokafka import AIOKafkaConsumer, TopicPartition
-from aiokafka.structs import OffsetAndMetadata
+from pathlib import Path
+from typing import List, Tuple, Dict, Any, Set, Optional
 
-from src.core.env_loader import get_env
 from src.core.logger import logger
 
-BOOTSTRAP = get_env("KAFKA_BOOTSTRAP", "localhost:9092")
-REQUEST_TIMEOUT = int(get_env("KAFKA_REQUEST_TIMEOUT_MS", "10000"))
 
-logger = logging.getLogger(__name__)
+class DataChecker:
+    """
+    Общий сервис для проверки папок и извлечения метаданных.
+    Переиспользуется в app_file_manager, app_macmap, app_groups и других модулях.
+    """
 
+    DEFAULT_DATE_PATTERN: str = r'^\d{4}-\d{2}-\d{2}$'  # YYYY-MM-DD
 
-async def get_admin_client() -> AIOKafkaAdminClient:
-    """Создаёт асинхронный админ-клиент."""
-    return AIOKafkaAdminClient(
-        bootstrap_servers=BOOTSTRAP,
-        request_timeout_ms=REQUEST_TIMEOUT,
-    )
-
-
-async def topic_exists(topic_name: str) -> bool:
-    admin = await get_admin_client()
-    try:
-        await admin.start()
-        topics = await admin.list_topics()
-        return topic_name in topics
-    except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка проверки топика {topic_name}: {e}")
+    @staticmethod
+    def _has_files_recursive(folder_path: Path) -> bool:
+        """Рекурсивно проверяет наличие файлов в папке и подпапках."""
+        if not folder_path.exists() or not folder_path.is_dir():
+            return False
+        try:
+            for item in folder_path.iterdir():
+                if item.is_file():
+                    return True
+                if item.is_dir() and DataChecker._has_files_recursive(item):
+                    return True
+        except PermissionError:
+            logger.warning(f"Нет прав доступа: {folder_path}")
+            return False
+        except Exception as e:
+            logger.error(f"Ошибка обхода: {e}")
+            return False
         return False
-    finally:
-        await admin.close()
 
+    @staticmethod
+    async def check_data_list(
+            base_url: Path,
+            folders: Optional[List[str]] = None
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Проверяет наличие папок и файлов в них (рекурсивно).
 
-async def ensure_topics(topics: List[str], partitions: int = 1, replication: int = 1) -> None:
-    admin = await get_admin_client()
-    try:
-        await admin.start()
-        existing = await admin.list_topics()
-        to_create = [
-            NewTopic(name=t, num_partitions=partitions, replication_factor=replication)
-            for t in topics if t not in existing
-        ]
-        if to_create:
-            await admin.create_topics(to_create)
-            logger.info(f"[KAFKA_ADMIN] Созданы топики: {[t.name for t in to_create]}")
-    except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка создания топиков: {e}")
-    finally:
-        await admin.close()
+        Args:
+            base_url: Базовый путь к данным
+            folders: Список имён папок для проверки (может быть None)
 
+        Returns:
+            Tuple[bool, Dict]:
+                success: True если все проверки пройдены
+                result: {
+                    'missing': [отсутствующие папки],
+                    'empty': [пустые папки],
+                    'found': [папки с файлами],
+                    'error': 'сообщение' (при критической ошибке)
+                }
+        """
+        if not folders:
+            logger.warning("[DataChecker] Параметр 'folders' пуст или None")
+            return False, {
+                'missing': [],
+                'empty': [],
+                'found': [],
+                'error': 'folders list is empty or None'
+            }
 
-async def list_topics() -> List[Dict[str, Any]]:
-    """
-    Возвращает список всех топиков (кроме служебных) с партициями.
-    """
-    admin = await get_admin_client()
-    try:
-        await admin.start()
-        cluster = admin._client.cluster
-        all_topics = cluster.topics()  # это set
+        # Нормализация: фильтруем пустые строки и дубликаты
+        folders = list(dict.fromkeys(f.strip() for f in folders if f and f.strip()))
+        if not folders:
+            return False, {
+                'missing': [],
+                'empty': [],
+                'found': [],
+                'error': 'no valid folders after normalization'
+            }
 
-        result = []
-        for topic in all_topics:
-            # Пропускаем внутренние топики (__consumer_offsets и т.п.)
-            if topic.startswith("__"):
-                continue
+        missing = []
+        empty = []
+        found = []
 
-            partitions = []
-            for p in cluster.partitions_for_topic(topic) or []:
-                partitions.append({
-                    "partition": p,
-                    "leader": cluster.leader_for_partition(TopicPartition(topic, p)),
-                    "replicas": list(cluster.replicas_for_partition(TopicPartition(topic, p)) or []),
-                    "isr": list(cluster.isr_for_partition(TopicPartition(topic, p)) or []),
-                })
+        if not base_url or not base_url.exists() or not base_url.is_dir():
+            logger.error(f"[DataChecker] Базовый путь невалиден: {base_url}")
+            return False, {
+                'missing': folders,
+                'empty': [],
+                'found': [],
+                'error': f'base_path_invalid: {base_url}'
+            }
 
-            result.append({
-                "name": topic,
-                "partitions": partitions,
-                "configs": {},
-                "description": None,
-            })
-
-        result.sort(key=lambda t: t["name"])
-        logger.info(f"[KAFKA_ADMIN] Получено {len(result)} топиков")
-        return result
-    except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка list_topics: {e}", exc_info=True)
-        # Пробрасываем исключение, чтобы клиент видел ошибку, а не пустой список
-        raise
-    finally:
-        await admin.close()
-
-
-async def list_groups() -> List[Dict[str, Any]]:
-    """
-    Возвращает список всех consumer groups с деталями.
-    Обрабатывает как строки, так и кортежи (group_id, protocol_type).
-    """
-    admin = await get_admin_client()
-    try:
-        await admin.start()
-        raw_groups = await admin.list_consumer_groups()
-        logger.debug(f"[KAFKA_ADMIN] Сырые группы: {raw_groups}")
-
-        result = []
-        for group in raw_groups:
-            # Если group — кортеж (group_id, protocol_type), берём первый элемент
-            if isinstance(group, tuple):
-                group_id = group[0]
-            else:
-                group_id = group
-
+        for folder in folders:
+            full_path = base_url / folder
             try:
-                desc = await admin.describe_consumer_groups([group_id])
-                group_desc = desc[group_id]
-                members = [
-                    {
-                        "member_id": m.member_id,
-                        "client_id": m.client_id,
-                        "host": m.client_host,
-                    }
-                    for m in group_desc.members
-                ]
-                result.append({
-                    "group_id": group_id,
-                    "protocol_type": group_desc.protocol_type,
-                    "state": group_desc.state,
-                    "members": members,
-                })
+                if not full_path.exists():
+                    missing.append(folder)
+                    continue
+                if not full_path.is_dir():
+                    missing.append(folder)
+                    continue
+                has_files = DataChecker._has_files_recursive(full_path)
+                if not has_files:
+                    empty.append(folder)
+                else:
+                    found.append(folder)
+            except PermissionError:
+                missing.append(folder)
             except Exception as e:
-                logger.warning(f"[KAFKA_ADMIN] Группа {group_id}: {e}")
-                result.append({
-                    "group_id": group_id,
-                    "protocol_type": "unknown",
-                    "state": "unknown",
-                    "members": [],
-                })
+                logger.error(f"Ошибка проверки '{folder}': {e}")
+                missing.append(folder)
 
-        result.sort(key=lambda g: g["group_id"])
-        logger.info(f"[KAFKA_ADMIN] Получено {len(result)} групп")
-        return result
-    except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка list_groups: {e}", exc_info=True)
-        raise
-    finally:
-        await admin.close()
+        success = len(missing) == 0 and len(empty) == 0
+        result = {
+            'missing': missing,
+            'empty': empty,
+            'found': found,
+            'total_checked': len(folders),
+            'base_path': str(base_url)
+        }
 
+        if missing:
+            logger.error(f"[DataChecker] Не найдено папок: {missing}")
+        if empty:
+            logger.warning(f"[DataChecker] Пустые папки: {empty}")
+        if found:
+            logger.info(f"[DataChecker] Найдено файлов в папках: {found}")
 
-async def get_group_lags(group_id: str) -> List[Dict[str, Any]]:
-    """
-    Вычисляет lag для каждой партиции consumer group.
-    """
-    admin = await get_admin_client()
-    consumer: Optional[AIOKafkaConsumer] = None
-    try:
-        await admin.start()
-        cluster = admin._client.cluster
+        return success, result
 
-        all_tps: List[TopicPartition] = []
-        for topic in cluster.topics():
-            if topic.startswith("__"):
-                continue
-            for p in cluster.partitions_for_topic(topic) or []:
-                all_tps.append(TopicPartition(topic, p))
+    @staticmethod
+    async def extract_dates_from_folders(
+            base_url: Path,
+            subfolder: str,
+            date_pattern: Optional[str] = None
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """Извлекает даты из имён подпапок."""
+        pattern = date_pattern or DataChecker.DEFAULT_DATE_PATTERN
+        result = {
+            'dates': [],
+            'total': 0,
+            'path': str(base_url / subfolder),
+            'error': None
+        }
 
-        if not all_tps:
-            return []
+        target_path = base_url / subfolder
+        if not target_path.exists():
+            result['error'] = f"Папка не найдена: {subfolder}"
+            return False, result
+        if not target_path.is_dir():
+            result['error'] = f"Не является папкой: {subfolder}"
+            return False, result
 
-        consumer = AIOKafkaConsumer(
-            bootstrap_servers=BOOTSTRAP,
-            group_id=group_id,
-            enable_auto_commit=False,
-        )
-        await consumer.start()
+        dates = set()
+        date_regex = re.compile(pattern)
+        try:
+            for item in target_path.iterdir():
+                if item.is_dir() and date_regex.match(item.name):
+                    dates.add(item.name)
+        except PermissionError:
+            result['error'] = "Нет прав доступа"
+            return False, result
+        except Exception as e:
+            result['error'] = f"Ошибка: {str(e)}"
+            return False, result
 
-        committed = await consumer.committed(*all_tps)
-        end_offsets = await consumer.end_offsets(all_tps)
+        sorted_dates = sorted(dates)
+        result['dates'] = sorted_dates
+        result['total'] = len(sorted_dates)
+        return True, result
 
-        lags = []
-        for tp in all_tps:
-            committed_offset = committed.get(tp)
-            if committed_offset is None:
-                continue
-            end = end_offsets.get(tp, 0)
-            lags.append({
-                "topic": tp.topic,
-                "partition": tp.partition,
-                "current_offset": committed_offset,
-                "end_offset": end,
-                "lag": max(0, end - committed_offset),
-            })
-
-        return lags
-    except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка get_group_lags({group_id}): {e}", exc_info=True)
-        return []
-    finally:
-        if consumer:
-            await consumer.stop()
-        await admin.close()
+    @staticmethod
+    def validate_dataset(dataset: str) -> Tuple[bool, Optional[str]]:
+        """Закладка на валидацию папки."""
+        return True, None

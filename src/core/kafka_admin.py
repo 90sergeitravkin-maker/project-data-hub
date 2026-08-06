@@ -1,13 +1,11 @@
 # src/core/kafka_admin.py
 """
 Асинхронное администрирование Kafka через aiokafka.
-Заменяет синхронный kafka-python полностью.
+Возвращает все топики и группы без фильтрации.
 """
 from typing import List, Dict, Any, Optional
-
-from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from aiokafka import AIOKafkaConsumer, TopicPartition
-from aiokafka.structs import OffsetAndMetadata
+from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 
 from src.core.env_loader import get_env
 from src.core.logger import logger
@@ -17,7 +15,6 @@ REQUEST_TIMEOUT = int(get_env("KAFKA_REQUEST_TIMEOUT_MS", "10000"))
 
 
 async def get_admin_client() -> AIOKafkaAdminClient:
-    """Создаёт асинхронный админ-клиент."""
     return AIOKafkaAdminClient(
         bootstrap_servers=BOOTSTRAP,
         request_timeout_ms=REQUEST_TIMEOUT,
@@ -25,7 +22,6 @@ async def get_admin_client() -> AIOKafkaAdminClient:
 
 
 async def topic_exists(topic_name: str) -> bool:
-    """Проверяет существование топика."""
     admin = await get_admin_client()
     try:
         await admin.start()
@@ -39,7 +35,6 @@ async def topic_exists(topic_name: str) -> bool:
 
 
 async def ensure_topics(topics: List[str], partitions: int = 1, replication: int = 1) -> None:
-    """Создаёт топики, если их нет."""
     admin = await get_admin_client()
     try:
         await admin.start()
@@ -58,53 +53,63 @@ async def ensure_topics(topics: List[str], partitions: int = 1, replication: int
 
 
 async def list_topics() -> List[Dict[str, Any]]:
-    """Список всех топиков с партициями."""
+    """
+    Возвращает список всех топиков (кроме служебных) с партициями.
+    Использует describe_topics для получения деталей.
+    """
     admin = await get_admin_client()
     try:
         await admin.start()
-        cluster = admin._client.cluster
+        # Получаем все имена топиков
+        all_topics = await admin.list_topics()
+        logger.debug(f"[KAFKA_ADMIN] Все топики: {all_topics}")
+
+        # Получаем детали по каждому топику (кроме служебных)
+        topics_to_describe = [t for t in all_topics if not t.startswith("__")]
+        descriptions = await admin.describe_topics(topics=topics_to_describe)
 
         result = []
-        for topic in cluster.topics():
-            if topic.startswith("__"):
-                continue
-            partitions = []
-            for p in cluster.partitions_for_topic(topic) or []:
-                partitions.append(
-                    {
-                        "partition": p,
-                        "leader": cluster.leader_for_partition(TopicPartition(topic, p)),
-                        "replicas": list(cluster.replicas_for_partition(TopicPartition(topic, p)) or []),
-                        "isr": list(cluster.isr_for_partition(TopicPartition(topic, p)) or []),
-                    }
-                )
-            result.append(
+        for desc in descriptions:
+            partitions = [
                 {
-                    "name": topic,
-                    "partitions": partitions,
-                    "configs": {},
-                    "description": None,
+                    "partition": p.partition,
+                    "leader": p.leader,
+                    "replicas": p.replicas,
+                    "isr": p.isr,
                 }
-            )
+                for p in desc.partitions
+            ]
+            result.append({
+                "name": desc.topic,
+                "partitions": partitions,
+                "configs": {},  # можно добавить через describe_configs, но для простоты оставим пустым
+                "description": None,
+            })
 
         result.sort(key=lambda t: t["name"])
+        logger.info(f"[KAFKA_ADMIN] Получено {len(result)} топиков")
         return result
     except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка list_topics: {e}")
-        return []
+        logger.error(f"[KAFKA_ADMIN] Ошибка list_topics: {e}", exc_info=True)
+        # Пробрасываем исключение, чтобы клиент видел ошибку
+        raise
     finally:
         await admin.close()
 
 
 async def list_groups() -> List[Dict[str, Any]]:
-    """Список consumer groups с обработкой как строк, так и кортежей."""
+    """
+    Возвращает список всех consumer groups с деталями.
+    Обрабатывает как строки, так и кортежи (group_id, protocol_type).
+    """
     admin = await get_admin_client()
     try:
         await admin.start()
-        groups = await admin.list_consumer_groups()
+        raw_groups = await admin.list_consumer_groups()
+        logger.debug(f"[KAFKA_ADMIN] Сырые группы: {raw_groups}")
+
         result = []
-        for group in groups:
-            # Если group — кортеж (group_id, protocol_type), берём первый элемент
+        for group in raw_groups:
             if isinstance(group, tuple):
                 group_id = group[0]
             else:
@@ -129,33 +134,30 @@ async def list_groups() -> List[Dict[str, Any]]:
                 })
             except Exception as e:
                 logger.warning(f"[KAFKA_ADMIN] Группа {group_id}: {e}")
-                result.append(
-                    {
-                        "group_id": group_id,
-                        "protocol_type": "unknown",
-                        "state": "unknown",
-                        "members": [],
-                    }
-                )
+                result.append({
+                    "group_id": group_id,
+                    "protocol_type": "unknown",
+                    "state": "unknown",
+                    "members": [],
+                })
 
         result.sort(key=lambda g: g["group_id"])
+        logger.info(f"[KAFKA_ADMIN] Получено {len(result)} групп")
         return result
     except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка list_groups: {e}")
-        return []
+        logger.error(f"[KAFKA_ADMIN] Ошибка list_groups: {e}", exc_info=True)
+        raise
     finally:
         await admin.close()
 
 
 async def get_group_lags(group_id: str) -> List[Dict[str, Any]]:
-    """Вычисляет lag для каждой партиции consumer group."""
     admin = await get_admin_client()
     consumer: Optional[AIOKafkaConsumer] = None
     try:
         await admin.start()
         cluster = admin._client.cluster
 
-        # Собираем все партиции
         all_tps: List[TopicPartition] = []
         for topic in cluster.topics():
             if topic.startswith("__"):
@@ -166,7 +168,6 @@ async def get_group_lags(group_id: str) -> List[Dict[str, Any]]:
         if not all_tps:
             return []
 
-        # Получаем committed offsets через consumer
         consumer = AIOKafkaConsumer(
             bootstrap_servers=BOOTSTRAP,
             group_id=group_id,
@@ -183,19 +184,17 @@ async def get_group_lags(group_id: str) -> List[Dict[str, Any]]:
             if committed_offset is None:
                 continue
             end = end_offsets.get(tp, 0)
-            lags.append(
-                {
-                    "topic": tp.topic,
-                    "partition": tp.partition,
-                    "current_offset": committed_offset,
-                    "end_offset": end,
-                    "lag": max(0, end - committed_offset),
-                }
-            )
+            lags.append({
+                "topic": tp.topic,
+                "partition": tp.partition,
+                "current_offset": committed_offset,
+                "end_offset": end,
+                "lag": max(0, end - committed_offset),
+            })
 
         return lags
     except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] ERROR get_group_lags({group_id}): {e}")
+        logger.error(f"[KAFKA_ADMIN] Ошибка get_group_lags({group_id}): {e}", exc_info=True)
         return []
     finally:
         if consumer:
