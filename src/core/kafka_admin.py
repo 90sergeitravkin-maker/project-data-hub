@@ -70,18 +70,22 @@ async def list_topics() -> List[Dict[str, Any]]:
                 continue
             partitions = []
             for p in cluster.partitions_for_topic(topic) or []:
-                partitions.append({
-                    "partition": p,
-                    "leader": cluster.leader_for_partition(TopicPartition(topic, p)),
-                    "replicas": list(cluster.replicas_for_partition(TopicPartition(topic, p)) or []),
-                    "isr": list(cluster.isr_for_partition(TopicPartition(topic, p)) or []),
-                })
-            result.append({
-                "name": topic,
-                "partitions": partitions,
-                "configs": {},
-                "description": None,
-            })
+                partitions.append(
+                    {
+                        "partition": p,
+                        "leader": cluster.leader_for_partition(TopicPartition(topic, p)),
+                        "replicas": list(cluster.replicas_for_partition(TopicPartition(topic, p)) or []),
+                        "isr": list(cluster.isr_for_partition(TopicPartition(topic, p)) or []),
+                    }
+                )
+            result.append(
+                {
+                    "name": topic,
+                    "partitions": partitions,
+                    "configs": {},
+                    "description": None,
+                }
+            )
 
         result.sort(key=lambda t: t["name"])
         return result
@@ -93,14 +97,19 @@ async def list_topics() -> List[Dict[str, Any]]:
 
 
 async def list_groups() -> List[Dict[str, Any]]:
-    """Список consumer groups."""
+    """Список consumer groups с обработкой как строк, так и кортежей."""
     admin = await get_admin_client()
     try:
         await admin.start()
         groups = await admin.list_consumer_groups()
-
         result = []
-        for group_id in groups:
+        for group in groups:
+            # Если group — кортеж (group_id, protocol_type), берём первый элемент
+            if isinstance(group, tuple):
+                group_id = group[0]
+            else:
+                group_id = group
+
             try:
                 desc = await admin.describe_consumer_groups([group_id])
                 group_desc = desc[group_id]
@@ -120,12 +129,14 @@ async def list_groups() -> List[Dict[str, Any]]:
                 })
             except Exception as e:
                 logger.warning(f"[KAFKA_ADMIN] Группа {group_id}: {e}")
-                result.append({
-                    "group_id": group_id,
-                    "protocol_type": "unknown",
-                    "state": "unknown",
-                    "members": [],
-                })
+                result.append(
+                    {
+                        "group_id": group_id,
+                        "protocol_type": "unknown",
+                        "state": "unknown",
+                        "members": [],
+                    }
+                )
 
         result.sort(key=lambda g: g["group_id"])
         return result
@@ -172,17 +183,19 @@ async def get_group_lags(group_id: str) -> List[Dict[str, Any]]:
             if committed_offset is None:
                 continue
             end = end_offsets.get(tp, 0)
-            lags.append({
-                "topic": tp.topic,
-                "partition": tp.partition,
-                "current_offset": committed_offset,
-                "end_offset": end,
-                "lag": max(0, end - committed_offset),
-            })
+            lags.append(
+                {
+                    "topic": tp.topic,
+                    "partition": tp.partition,
+                    "current_offset": committed_offset,
+                    "end_offset": end,
+                    "lag": max(0, end - committed_offset),
+                }
+            )
 
         return lags
     except Exception as e:
-        logger.error(f"[KAFKA_ADMIN] Ошибка get_group_lags({group_id}): {e}")
+        logger.error(f"[KAFKA_ADMIN] ERROR get_group_lags({group_id}): {e}")
         return []
     finally:
         if consumer:
