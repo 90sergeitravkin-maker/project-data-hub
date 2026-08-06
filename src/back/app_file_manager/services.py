@@ -191,7 +191,6 @@ class AppDataChecker:
                 logger.warning(f"[SCAN] Доступ запрещён: target_dir={target_dir}")
                 return False, {'error': 'Доступ запрещён: путь выходит за пределы корневой директории'}
 
-            # ✅ ИСПРАВЛЕНО: Если директория не найдена — возвращаем пустой результат, а не ошибку
             if not target_dir.exists() or not target_dir.is_dir():
                 logger.debug(f"[SCAN] Директория не найдена: {folder_path} — возвращаем пустой результат")
                 return True, {

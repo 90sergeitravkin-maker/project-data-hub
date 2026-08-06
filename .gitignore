@@ -47,3 +47,5 @@ wheels/
 Thumbs.db
 /packages-microsoft-prod.deb
 /logs/
+/project_code.txt
+/project_structure.txt

@@ -31,7 +31,8 @@ from src.back.app_ecomru.config import (
     KAFKA_DOWNLOAD_TOPIC, KAFKA_DOWNLOAD_GROUP_ID,
     KAFKA_VERIFICATION_TOPIC, KAFKA_VERIFICATION_GROUP_ID,
 )
-
+from src.back.app_ecomru.check_data.config import PROCESS_FOLDER_TOPIC, PROCESS_FOLDER_GROUP_ID
+from src.back.app_ecomru.check_data.services import handle_process_folder_task
 # Конфигурация
 SERVICE_LOG_LEVEL = get_env("SERVICE_LOG_LEVEL", "INFO").upper()
 CORS_ORIGINS = [o.strip() for o in get_env("CORS_ORIGINS", "*").split(",") if o.strip()]
@@ -57,8 +58,10 @@ async def lifespan(app: FastAPI):
     consumer_task = None
     try:
         await kafka_client.start()
+
         kafka_client.register_consumer(KAFKA_DOWNLOAD_TOPIC, KAFKA_DOWNLOAD_GROUP_ID, handle_download_task)
         kafka_client.register_consumer(KAFKA_VERIFICATION_TOPIC, KAFKA_VERIFICATION_GROUP_ID, handle_verification_task)
+        kafka_client.register_consumer(PROCESS_FOLDER_TOPIC, PROCESS_FOLDER_GROUP_ID, handle_process_folder_task)
 
         consumer_task = asyncio.create_task(kafka_client.run_consumers())
         logger.info("[KAFKA] Консюмеры запущены")
@@ -127,7 +130,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "src.main:app",
         host="127.0.0.1",
-        port=8081,
+        port=8080,
         reload=True,
         log_level=SERVICE_LOG_LEVEL.lower(),
         access_log=True,

@@ -39,5 +39,5 @@ RELOAD = config.reload
 
 openapi_tags = {
     "name": TAG_NAME,
-    "description": "Мониторинг доступности файлов и извлечение схем данных."
+    "description": "Мониторинг доступности файлов, извлечение схем, выполнение SQL-запросов через DuckDB."
 }

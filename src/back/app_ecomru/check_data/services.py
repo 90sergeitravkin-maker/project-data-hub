@@ -8,9 +8,11 @@ from src.back.app_ecomru.config import DATA_FILE_RAW, DATA_FILE_TEMP, ALLOWED_PR
 from src.back.app_ecomru.check_data.file_manager import DuckDBFileManager
 
 
-def _validate_folder(path: Path, *, require_read=False, require_write=False,
-                     base_path: Path = DATA_FILE_RAW, check_inside_base=True,
-                     allow_create_parent=False, must_not_equal=None) -> Dict[str, Any]:
+def _validate_folder(
+        path: Path, *, require_read=False, require_write=False,
+        base_path: Path = DATA_FILE_RAW, check_inside_base=True,
+        allow_create_parent=False, must_not_equal=None
+) -> Dict[str, Any]:
     """(без изменений — ваш существующий код)"""
     if not path.exists():
         if allow_create_parent:
@@ -116,3 +118,39 @@ def process_data_folder(folder_path: str, split_column: str = "dataset_checksum"
         "split_result": result,
         "checksum_result": checksum_result,
     }
+
+
+async def handle_process_folder_task(task: Dict[str, Any]) -> None:
+    """Обработчик задач из топика process-folder."""
+    folder_path = task.get("folder_path")
+    split_column = task.get("split_column", "dataset_checksum")
+    task_id = task.get("task_id") or str(uuid.uuid4())
+
+    if not folder_path:
+        raise InvalidMessageError("Отсутствует folder_path в задаче")
+
+    logger.info(f"[PROCESS_FOLDER] Получена задача: folder={folder_path}, column={split_column}, task_id={task_id}")
+
+    try:
+        result = await asyncio.to_thread(process_data_folder, folder_path, split_column)
+        result_message = {
+            "task_id": task_id,
+            "status": "completed",
+            "result": result,
+            "folder_path": folder_path,
+            "split_column": split_column,
+        }
+        await kafka_client.send_message(PROCESS_FOLDER_RESULT_TOPIC, value=result_message, key=task_id)
+        logger.info(
+            f"[PROCESS_FOLDER] ✅ Задача {task_id} выполнена, результат отправлен в {PROCESS_FOLDER_RESULT_TOPIC}")
+    except Exception as e:
+        logger.error(f"[PROCESS_FOLDER] ❌ Ошибка выполнения задачи {task_id}: {e}", exc_info=True)
+        error_message = {
+            "task_id": task_id,
+            "status": "error",
+            "error": str(e),
+            "folder_path": folder_path,
+            "split_column": split_column,
+        }
+        await kafka_client.send_message(PROCESS_FOLDER_RESULT_TOPIC, value=error_message, key=task_id)
+        raise

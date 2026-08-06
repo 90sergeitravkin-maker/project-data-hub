@@ -323,7 +323,7 @@
             <div class="path-info mt-3">
                 📍 Текущий путь:
                 <span class="path-display">
-                    <code id="current-path">{% if current_path %}/{{ current_path }}{% else %}/{% endif %}</code>
+                    <code id="current-path">{% if current_path %}{{ current_path }}{% else %}/{% endif %}</code>
                     <button class="copy-btn" onclick="copyToClipboard('current-path', this)" title="Копировать путь">📋</button>
                 </span>
             </div>
