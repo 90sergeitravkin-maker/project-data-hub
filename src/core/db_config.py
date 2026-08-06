@@ -11,7 +11,7 @@ from src.core.secrets import SecureDSN
 # === Маппинг алиасов БД → переменные окружения ===
 ALIAS_TO_ENV: Dict[str, str] = {
     "base_01":            "DB_LOCAL_01",
-    "app_users":           "APP_USER_DB",
+    "app_users":          "APP_USER_DB",
     "app_file_manager":   "APP_SYSTEMS_DB",
     "app_servises":       "APP_SERVICES_DB",
     "app_data_registry":  "APP_DATA_REGISTRY_DB",
