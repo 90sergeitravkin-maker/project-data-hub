@@ -1,8 +1,7 @@
-#  src/back/app_ecomru/check_data/file_manager.py
+# src/back/app_ecomru/check_data/file_manager.py
 import os
 import shutil
 import duckdb
-
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Generator
 
@@ -16,9 +15,11 @@ class DuckDBFileManager:
     Предоставляет полный набор методов для проверки, разбиения, конвертации,
     поиска файлов, работы с путями и контрольными суммами.
     """
+
     memory_limit = '2GB'
 
-    def __init__(self, raw_dir: Optional[Path] = None, test_dir: Optional[Path] = None,
+    def __init__(self, raw_dir: Optional[Path] = None,
+                 test_dir: Optional[Path] = None,
                  max_file_size: Optional[int] = None):
         """
         Инициализация менеджера.
@@ -32,7 +33,6 @@ class DuckDBFileManager:
         self.max_file_size = max_file_size if max_file_size is not None else MAX_FILE_SIZE
 
     # ---------- Вспомогательные методы работы с папками ----------
-
     @staticmethod
     def clear_directory(directory: Path) -> None:
         """
@@ -111,7 +111,9 @@ class DuckDBFileManager:
         return sorted(found)
 
     @staticmethod
-    def remove_suffix_from_files(directory: str, extension: str, suffix: str = '.sended') -> None:
+    def remove_suffix_from_files(directory: str,
+                                 extension: str,
+                                 suffix: str = '.sended') -> None:
         """
         Рекурсивно переименовывает файлы, убирая суффикс (например, .sended) из имени.
         """
@@ -138,7 +140,6 @@ class DuckDBFileManager:
         logger.info(f'Total renamed files: {renamed_count}')
 
     # ---------- Методы работы с путями ----------
-
     @staticmethod
     def trim_to_source(full_path: str) -> str:
         """
@@ -148,6 +149,7 @@ class DuckDBFileManager:
         index = full_path.find(marker)
         if index == -1:
             raise ValueError(f"Подстрока '{marker}' не найдена в пути: {full_path}")
+
         remainder = full_path[index + len(marker):]
         if remainder.startswith(('\\', '/')):
             remainder = remainder[1:]
@@ -177,13 +179,13 @@ class DuckDBFileManager:
             .replace('<', '_').replace('>', '_').replace('|', '_')
 
     # ---------- Проверка и анализ файлов ----------
-
     def comprehensive_file_check(self, filepath: str) -> Optional[List[tuple]]:
         """
         Проверяет файл: существование, расширение, возможность прочитать через DuckDB.
         Возвращает схему (результат DESCRIBE) или None при ошибке.
         """
         filepath = str(filepath)
+
         if not os.path.isfile(filepath):
             logger.warning(f'Файл не найден: {filepath}')
             return None
@@ -203,7 +205,7 @@ class DuckDBFileManager:
             with duckdb.connect() as con:
                 query = f"DESCRIBE FROM {readers[ext]}(?)"
                 result = con.execute(query, [filepath]).fetchall()
-            return result
+                return result
         except Exception as e:
             logger.exception(f"Ошибка при выполнении DESCRIBE для {filepath}: {e}")
             return None
@@ -217,6 +219,7 @@ class DuckDBFileManager:
         :param path_pattern: путь к папке, файлу или маске (например, "/data/*.parquet")
         """
         pattern = Path(path_pattern)
+
         if pattern.is_dir():
             files = list(pattern.glob("*.parquet"))
         elif pattern.is_file() and pattern.suffix == '.parquet':
@@ -266,20 +269,29 @@ class DuckDBFileManager:
                 logger.error(f"Ошибка при вычислении контрольной суммы: {e}")
                 return {}
 
-    # ---------- Разбиение данных по столбцу ----------
-
-    def split_data_by_columns(self, source_dir: Path, target_dir: Path,
-                              split_column: str) -> Dict[str, Any]:
+    # ---------- Разбиение данных по столбцам (1 или несколько) ----------
+    def split_data_by_columns(self,
+                              source_dir: Path,
+                              target_dir: Path,
+                              split_columns: Union[str, List[str]]) -> Dict[str, Any]:
         """
         Разбивает данные из Parquet-файлов в source_dir на отдельные файлы по уникальным
-        значениям столбца split_column. Результаты сохраняются в target_dir.
-        Использует параметр self.max_file_size для управления размером частей.
+        комбинациям значений столбцов. Результаты сохраняются в target_dir.
+
+        Поддерживает один столбец (str) или несколько (List[str]).
+        При нескольких столбцах группировка идёт по комбинации значений (как GROUP BY).
 
         :param source_dir: Папка с исходными Parquet-файлами
         :param target_dir: Папка для сохранения результатов
-        :param split_column: Имя столбца для разбиения
+        :param split_columns: Имя столбца (str) или список столбцов (List[str])
         :return: Словарь со статусом и статистикой
         """
+        # Нормализация: строка -> список
+        if isinstance(split_columns, str):
+            split_columns = [split_columns]
+        if not split_columns:
+            return {"status": "error", "error": "Не указаны столбцы для разбиения"}
+
         source_dir = Path(source_dir)
         target_dir = Path(target_dir)
 
@@ -300,27 +312,45 @@ class DuckDBFileManager:
             con.execute("SET threads TO 4")
 
             files_str = ", ".join([f"'{f}'" for f in files])
-            safe_column = split_column.replace('"', '""')
 
-            unique_values = con.execute(f"""
-                SELECT DISTINCT "{safe_column}"
+            # Экранируем имена столбцов
+            safe_columns = [c.replace('"', '""') for c in split_columns]
+            columns_list = ", ".join([f'"{c}"' for c in safe_columns])
+
+            # Условие: все столбцы не NULL и не пустые
+            not_null_cond = " AND ".join([
+                f'"{c}" IS NOT NULL AND TRIM("{c}"::VARCHAR) != \'\''
+                for c in safe_columns
+            ])
+
+            # Получаем уникальные комбинации значений всех столбцов
+            unique_combos = con.execute(f"""
+                SELECT DISTINCT {columns_list}
                 FROM read_parquet([{files_str}])
-                WHERE "{safe_column}" IS NOT NULL
-                  AND TRIM("{safe_column}"::VARCHAR) != ''
+                WHERE {not_null_cond}
             """).fetchall()
 
             result_stats = {}
             total_rows_all = 0
 
-            for (value,) in unique_values:
-                base_name = self.sanitize_name(str(value))
-                escaped_value = str(value).replace("'", "''")
+            for combo in unique_combos:
+                # combo — кортеж значений (val1, val2, ...)
+                # Имя файла из комбинации значений через "_"
+                name_parts = [self.sanitize_name(str(v)) for v in combo]
+                base_name = "_".join(name_parts)
+
+                # WHERE по всем столбцам текущей комбинации
+                where_parts = []
+                for col, val in zip(safe_columns, combo):
+                    escaped_value = str(val).replace("'", "''")
+                    where_parts.append(f'"{col}" = \'{escaped_value}\'')
+                where_clause = " AND ".join(where_parts)
 
                 pattern = f"{base_name}_{{i}}.parquet"
                 copy_sql = f"""
                     COPY (
                         FROM read_parquet([{files_str}])
-                        WHERE "{safe_column}" = '{escaped_value}'
+                        WHERE {where_clause}
                     )
                     TO '{target_dir.as_posix()}/'
                     (FORMAT PARQUET,
@@ -346,42 +376,46 @@ class DuckDBFileManager:
                 count_sql = f"SELECT SUM(cnt) FROM (SELECT COUNT(*) AS cnt FROM read_parquet([{files_list}]))"
                 total_rows = con.execute(count_sql).fetchone()[0]
 
-                result_stats[str(value)] = {
+                combo_key = "_".join(str(v) for v in combo)
+                result_stats[combo_key] = {
                     "paths": renamed_paths,
                     "total_rows": total_rows,
                     "num_parts": len(renamed_paths)
                 }
                 total_rows_all += total_rows
 
-            return {
-                "status": "completed",
-                "total_files_processed": len(files),
-                "unique_values": len(result_stats),
-                "total_rows": total_rows_all,
-                "details": result_stats,
-                "output_dir": str(target_dir)
-            }
+        return {
+            "status": "completed",
+            "total_files_processed": len(files),
+            "unique_values": len(result_stats),
+            "total_rows": total_rows_all,
+            "details": result_stats,
+            "output_dir": str(target_dir)
+        }
 
     # ---------- Удобные обёртки для предопределённых путей ----------
-
-    def split_data_by_columns_with_config(self, root_dir: Path, split_column: str) -> Dict[str, Any]:
+    def split_data_by_columns_with_config(self,
+                                          root_dir: Path,
+                                          split_columns: Union[str, List[str]], ) -> Dict[str, Any]:
         """
         Разбивает данные, используя self.raw_dir и self.test_dir как корневые директории.
         """
         source_dir = self.raw_dir / root_dir
         target_dir = self.test_dir / root_dir
-        return self.split_data_by_columns(source_dir, target_dir, split_column)
+        return self.split_data_by_columns(source_dir, target_dir, split_columns)
 
     # ---------- Конвертация ----------
-
-    def convert_parquet_to_csv(self, parquet_path: Path, csv_path: Optional[Path] = None) -> Dict[str, Any]:
+    def convert_parquet_to_csv(self, parquet_path: Path,
+                               csv_path: Optional[Path] = None) -> Dict[str, Any]:
         """
         Конвертирует Parquet файл в CSV.
+
         :param parquet_path: Путь к исходному Parquet файлу.
         :param csv_path: Путь для сохранения CSV. Если не указан, сохраняется рядом с исходным.
         :return: Словарь со статусом и статистикой.
         """
         parquet_path = Path(parquet_path)
+
         if not parquet_path.exists() or not parquet_path.is_file():
             return {"status": "error", "error": f"Parquet файл не найден: {parquet_path}"}
 
@@ -389,7 +423,8 @@ class DuckDBFileManager:
             csv_path = parquet_path.with_suffix('.csv')
         else:
             csv_path = Path(csv_path)
-            csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             with duckdb.connect() as con:
@@ -400,8 +435,8 @@ class DuckDBFileManager:
                     COPY (
                         SELECT * FROM read_parquet('{parquet_path.as_posix()}')
                     ) TO '{csv_path.as_posix()}' (
-                        FORMAT CSV, 
-                        HEADER, 
+                        FORMAT CSV,
+                        HEADER,
                         DELIMITER ','
                     )
                 """

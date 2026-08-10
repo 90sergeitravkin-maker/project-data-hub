@@ -11,6 +11,7 @@ from src.back.app_ecomru.config import (
     KAFKA_TRANSFER_TOPIC,
     KAFKA_VERIFICATION_TOPIC,
     KAFKA_REPORT_TOPIC,
+    get_split_columns,
 )
 from src.back.app_ecomru.download.download import download_and_move_atomically
 from src.back.app_datasets.services import DataSetsVerifiedServices
@@ -29,6 +30,25 @@ async def _save_links_to_app_link(urls: list[str]) -> None:
         logger.info(f"[DOWNLOAD] app_link: новых={new_count}, дубликатов={dup_count}")
     except Exception as e:
         logger.error(f"[DOWNLOAD] Ошибка сохранения в app_link: {e}", exc_info=True)
+
+
+def _resolve_split_columns(task: Dict[str, Any], entity: str) -> List[str]:
+    """
+    Определяет список столбцов разбиения.
+    Приоритет: split_column/split_columns из сообщения → конфиг по entity (hot-reload).
+    """
+    # 1. Из сообщения: split_columns (список)
+    raw_list = task.get("split_columns")
+    if isinstance(raw_list, list) and raw_list:
+        return [c for c in raw_list if isinstance(c, str) and c]
+
+    # 2. Из сообщения: split_column (строка)
+    raw_single = task.get("split_columns")
+    if isinstance(raw_single, str) and raw_single:
+        return [raw_single]
+
+    # 3. Из конфига по entity (hot-reload)
+    return get_split_columns(entity)
 
 
 # ============================================================
@@ -59,7 +79,8 @@ async def handle_download_task(task: Dict[str, Any]) -> None:
         updated_at = parts[1] if len(parts) > 1 else task.get("updated_at", "")
         period = parts[2] if len(parts) > 2 else task.get("period", "")
 
-    split_column = task.get("split_column")
+    # Столбцы разбиения: из сообщения или из конфига (hot-reload)
+    split_columns = _resolve_split_columns(task, entity)
 
     data = {
         "entity": entity,
@@ -69,7 +90,7 @@ async def handle_download_task(task: Dict[str, Any]) -> None:
     }
 
     logger.info(f"[DOWNLOAD] Получена задача: task_id={task_id}, entity={entity}, "
-                f"files={len(urls)}, split_column={split_column or 'НЕТ'}")
+                f"files={len(urls)}, split_columns={split_columns or 'НЕТ'}")
 
     # ---- Скачивание ----
     download_errors: List[str] = []
@@ -83,7 +104,7 @@ async def handle_download_task(task: Dict[str, Any]) -> None:
         logger.error(f"[DOWNLOAD] ❌ Ошибка скачивания: {e}", exc_info=True)
         download_errors.append(str(e))
         download_status = "error"
-        # ❗ НЕ делаем raise! Передаём ошибку в verification, чтобы Airflow получил отчёт.
+        # НЕ делаем raise! Передаём ошибку в verification, чтобы Airflow получил отчёт.
 
     # ---- Сохранение метаданных (только если есть файлы) ----
     for file_path in moved_files:
@@ -107,7 +128,7 @@ async def handle_download_task(task: Dict[str, Any]) -> None:
         "updated_at": updated_at,
         "period": period,
         "folder_path": folder_path,
-        "split_column": split_column,
+        "split_columns": split_columns,  # список столбцов (может быть пустым)
         "download_result": {
             "status": download_status,
             "files_downloaded": len(moved_files),
@@ -139,12 +160,15 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
     """
     task_id = task.get("task_id") or str(uuid.uuid4())
     folder_path = task.get("folder_path")
-    split_column = task.get("split_column")
     entity = task.get("entity", "")
     updated_at = task.get("updated_at", "")
     period = task.get("period", "")
     download_result_data = task.get("download_result", {})
     pipeline_started_at = task.get("started_at", datetime.now(timezone.utc).isoformat())
+
+    # Столбцы разбиения: из задачи или из конфига (hot-reload)
+    split_columns = _resolve_split_columns(task, entity)
+    split_columns_str = ", ".join(split_columns) if split_columns else None
 
     if not folder_path or not isinstance(folder_path, str):
         raise InvalidMessageError(
@@ -153,7 +177,7 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
 
     logger.info(
         f"[VERIFICATION] Получена задача: task_id={task_id}, folder={folder_path}, "
-        f"column={split_column or 'НЕ УКАЗАН (пропуск разбиения)'}"
+        f"columns={split_columns or 'НЕ УКАЗАНЫ (пропуск разбиения)'}"
     )
 
     processing_result = ProcessingResult(status="skipped", split_performed=False)
@@ -166,18 +190,19 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
             split_performed=False,
             errors=["Пропущено из-за ошибки скачивания"],
         )
-    elif split_column:
+    elif split_columns:
         try:
             # Импорт внутри функции, чтобы избежать циклических импортов
             from src.back.app_ecomru.check_data.services import process_data_folder
 
-            result = await asyncio.to_thread(process_data_folder, folder_path, split_column)
+            # Передаём СПИСОК столбцов
+            result = await asyncio.to_thread(process_data_folder, folder_path, split_columns)
             status = result.get("status")
 
             if status == "error":
                 processing_result = ProcessingResult(
                     status="error",
-                    split_column=split_column,
+                    split_column=split_columns_str,
                     errors=[result.get("error", "Unknown error")],
                 )
                 processing_error = result.get("error", "Unknown error")
@@ -185,7 +210,7 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
                 logger.warning(f"[VERIFICATION] Нет файлов: {result.get('message')}")
                 processing_result = ProcessingResult(
                     status="completed",
-                    split_column=split_column,
+                    split_column=split_columns_str,
                     split_performed=False,
                 )
             else:
@@ -195,7 +220,7 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
                 processing_result = ProcessingResult(
                     status="completed",
                     split_performed=True,
-                    split_column=split_column,
+                    split_column=split_columns_str,
                     unique_values=split_result.get("unique_values", 0),
                     total_rows=split_result.get("total_rows", 0),
                     output_files_count=sum(
@@ -218,6 +243,7 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
                     "updated_at": updated_at,
                     "period": period,
                     "folder_path": folder_path,
+                    "split_columns": split_columns,
                     "split_result": split_result,
                     "checksum_result": checksum_result,
                 }
@@ -229,12 +255,12 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
             logger.error(f"[VERIFICATION] Ошибка: {e}", exc_info=True)
             processing_result = ProcessingResult(
                 status="error",
-                split_column=split_column,
+                split_column=split_columns_str,
                 errors=[str(e)],
             )
             processing_error = str(e)
     else:
-        logger.info(f"[VERIFICATION] split_column не указан — разбиение пропущено")
+        logger.info(f"[VERIFICATION] split_columns не указаны — разбиение пропущено")
         processing_result = ProcessingResult(
             status="completed",
             split_performed=False,
@@ -283,8 +309,6 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
     )
 
     # ---- Обработка ошибок для Kafka (DLQ/Retry) ----
-    # Отчёт для Airflow уже ушёл. Если нужно, чтобы сообщение ушло в DLQ при ошибке обработки,
-    # раскомментируйте raise ниже. Если Airflow сам разбирается со статусом 'failed', raise не нужен.
     if processing_error:
         logger.error(f"[VERIFICATION] Задача завершена с ошибкой: {processing_error}")
         # raise RuntimeError(f"[VERIFICATION] Ошибка обработки: {processing_error}")

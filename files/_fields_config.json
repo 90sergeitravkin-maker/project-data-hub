@@ -4,6 +4,11 @@
     "reporter_code"
   ],
   "API-COMTRADE-WORLD_TRADE-1": {
+    "processing": {
+      "split_columns": [
+        "dataset_checksum"
+      ]
+    },
     "column": {
       "hash_address": {
         "type": "String",

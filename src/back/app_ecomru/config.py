@@ -3,6 +3,8 @@
 import json
 import os
 from pathlib import Path
+from typing import Any, Dict, List
+
 from dotenv import load_dotenv
 
 from src.core.logger import logger
@@ -14,16 +16,82 @@ if _env_path.exists():
     logger.debug(f"[CONFIG] .env загружен: {_env_path}")
 
 CONFIG_PATH = Path(_env_path).parent / "files" / "_fields_config.json"
-if not CONFIG_PATH.is_file():
-    logger.error(f"Файл конфигурации не найден: {CONFIG_PATH}")
-    ALLOWED_PREFIXES = {}
-else:
+
+
+# ============================================================
+# HOT-RELOAD конфиг полей (читается при каждом вызове)
+# ============================================================
+def _normalize_keys(obj: Any) -> Any:
+    """
+    Рекурсивно убирает пробелы из ключей dict и строковых значений.
+    В _fields_config.json ключи и значения содержат пробелы в конце.
+    """
+    if isinstance(obj, dict):
+        return {k.strip(): _normalize_keys(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize_keys(item) for item in obj]
+    if isinstance(obj, str):
+        return obj.strip()
+    return obj
+
+
+def load_fields_config() -> Dict[str, Any]:
+    """
+    Читает _fields_config.json с диска КАЖДЫЙ раз (hot-reload).
+    Нормализует пробелы в ключах и значениях.
+    """
+    if not CONFIG_PATH.is_file():
+        logger.error(f"[CONFIG] Файл конфигурации не найден: {CONFIG_PATH}")
+        return {}
     try:
-        r = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
-        ALLOWED_PREFIXES = list(r.keys())
+        raw = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
+        return _normalize_keys(raw)
     except json.JSONDecodeError as e:
-        logger.error(f"Ошибка синтаксиса JSON в {CONFIG_PATH}: {e}")
-        ALLOWED_PREFIXES = {}
+        logger.error(f"[CONFIG] Ошибка синтаксиса JSON в {CONFIG_PATH}: {e}")
+        return {}
+
+
+def get_allowed_prefixes() -> List[str]:
+    """Возвращает список разрешённых entity (hot-reload)."""
+    return list(load_fields_config().keys())
+
+
+def get_split_columns(entity: str) -> List[str]:
+    """
+    Возвращает список столбцов для разбиения по entity (hot-reload).
+
+    Поддерживает два формата в _fields_config.json:
+      1. Простой список:  {"ENTITY": ["col1", "col2"]}
+      2. Объект:          {"ENTITY": {"processing": {"split_column": ["col1"]}}}
+    """
+    if not entity:
+        return []
+
+    config = load_fields_config()  # читаем файл каждый раз
+    entity_cfg = config.get(entity.strip())
+    if entity_cfg is None:
+        logger.debug(f"[CONFIG] entity '{entity}' не найден в {CONFIG_PATH.name}")
+        return []
+
+    # Формат 1: простой список столбцов
+    if isinstance(entity_cfg, list):
+        return [c for c in entity_cfg if isinstance(c, str) and c]
+
+    # Формат 2: объект с processing.split_column
+    if isinstance(entity_cfg, dict):
+        processing = entity_cfg.get("processing", {})
+        if isinstance(processing, dict):
+            cols = processing.get("split_columns", [])
+            if isinstance(cols, list):
+                return [c for c in cols if isinstance(c, str) and c]
+            if isinstance(cols, str) and cols:
+                return [cols]
+
+    return []
+
+
+# Для обратной совместимости (нормализовано при старте)
+ALLOWED_PREFIXES = get_allowed_prefixes()
 
 # === Основные параметры приложения ===
 APP_NAME = "app_ecomru"
@@ -80,6 +148,7 @@ openapi_tags = {
 DISK_SPACE_SAFETY_FACTOR = 2 * 1024 * 1024 * 1024  # 2 ГБ в байтах
 KAFKA_REPORT_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_REPORT", "ecomru-report")
 KAFKA_REPORT_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_REPORT", "ecomru-report-group")
+
 
 def ensure_storage_ready() -> Path:
     """Инициализация директории хранения. Вызывается в lifespan."""
