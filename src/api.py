@@ -17,7 +17,6 @@ openapi_tags: List[Dict[str, str]] = [
     },
 ]
 
-
 def _collect_app_openapi_tags() -> List[Dict[str, str]]:
     """
     Собирает openapi_tags из конфигов всех доступных приложений.
