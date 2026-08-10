@@ -1,68 +1,88 @@
-# src/front/web_monitor/download.py
+# src/front/web_monitor/services.py
 """
-Прокси-сервис для web интерфейса monitor.
-Вызывает backend app_monitor без авторизации.
+Сервис для web интерфейса monitor.
+Напрямую вызывает backend-методы app_monitor (без HTTP-запросов).
 """
-import httpx
-from typing import Optional, Dict, Any
-from src.core.logger import logger
+from typing import Optional, Dict, Any, List
+from datetime import datetime, timezone
 
-MONITOR_API_BASE = "http://127.0.0.1:8081/api/v1/app_monitor"
+from src.back.app_monitor.services import MemoryMonitorService
+from src.back.app_monitor.config import DISK_PATHS
 
 
 class WebMonitorService:
     """Сервис для работы с web интерфейсом монитора."""
 
-    @staticmethod
-    async def _get(endpoint: str, params: Optional[dict] = None) -> Dict[str, Any]:
-        """Универсальный GET-запрос к backend app_monitor."""
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{MONITOR_API_BASE}/{endpoint}",
-                    params=params or {},
-                )
-                response.raise_for_status()
-                return response.json()
-        except httpx.HTTPStatusError as e:
-            status_code = e.response.status_code if e.response else 500
-            logger.error(f"[WEB_MONITOR] HTTP {status_code} при получении {endpoint}")
-            return {"error": f"HTTP {status_code}", "status_code": status_code}
-        except httpx.HTTPError as e:
-            logger.error(f"[WEB_MONITOR] Ошибка {endpoint}: {e}")
-            return {"error": str(e), "status_code": 500}
-        except Exception as e:
-            logger.error(f"[WEB_MONITOR] Неожиданная ошибка {endpoint}: {e}")
-            return {"error": str(e), "status_code": 500}
-
     @classmethod
     async def get_report(cls) -> Dict[str, Any]:
-        return await cls._get("report")
+        """Сводный отчёт по RAM всех приложений (live)."""
+        try:
+            report = await MemoryMonitorService.get_apps_report()
+            return report.model_dump()
+        except Exception as e:
+            return {"error": str(e), "status_code": 500}
 
     @classmethod
     async def get_snapshots(
-            cls,
-            app_name: Optional[str] = None,
-            minutes: int = 60,
-            limit: int = 200,
+        cls,
+        app_name: Optional[str] = None,
+        minutes: int = 60,
+        limit: int = 200,
     ) -> Dict[str, Any]:
-        params = {"minutes": minutes, "limit": limit}
-        if app_name:
-            params["app_name"] = app_name
-        return await cls._get("snapshots", params)
+        """История снимков памяти."""
+        try:
+            snapshots = await MemoryMonitorService.get_snapshots(
+                app_name=app_name,
+                minutes=minutes,
+                limit=limit,
+            )
+            return {
+                "snapshots": [s.model_dump() for s in snapshots],
+                "status": "ok",
+            }
+        except Exception as e:
+            return {"error": str(e), "status_code": 500}
 
     @classmethod
-    async def get_heavy_requests(cls, minutes: int = 60, top_n: int = 10) -> Dict[str, Any]:
-        return await cls._get(
-            "heavy-requests",
-            {"minutes": minutes, "top_n": top_n, "min_delta_mb": 1.0},
-        )
+    async def get_heavy_requests(
+        cls,
+        minutes: int = 60,
+        top_n: int = 10,
+    ) -> Dict[str, Any]:
+        """Топ тяжёлых запросов."""
+        try:
+            heavy = await MemoryMonitorService.get_heavy_requests(
+                minutes=minutes,
+                top_n=top_n,
+                min_delta_mb=1.0,
+            )
+            return {
+                "heavy_requests": [h.model_dump() for h in heavy],
+                "status": "ok",
+            }
+        except Exception as e:
+            return {"error": str(e), "status_code": 500}
 
     @classmethod
     async def get_alerts(cls, limit: int = 30) -> Dict[str, Any]:
-        return await cls._get("alerts", {"limit": limit})
+        """Журнал алертов."""
+        try:
+            alerts = await MemoryMonitorService.get_alerts(limit=limit)
+            return {
+                "alerts": [a.model_dump() for a in alerts],
+                "status": "ok",
+            }
+        except Exception as e:
+            return {"error": str(e), "status_code": 500}
 
     @classmethod
     async def get_disk_usage(cls) -> Dict[str, Any]:
         """Получить информацию о дисковом пространстве."""
-        return await cls._get("disk-usage")
+        try:
+            items = MemoryMonitorService.get_disk_usage(DISK_PATHS)
+            return {
+                "paths": items,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+            }
+        except Exception as e:
+            return {"error": str(e), "status_code": 500}

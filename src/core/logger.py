@@ -116,14 +116,12 @@ class SensitiveDataFilter(logging.Filter):
         return arg
 
 
-def config_logging(
-        level=logging.INFO,
-        log_file: str | Path | None = 'logs/app.log',
-        mask_sensitive_data: bool = True,
-        max_bytes: int = 10 * 1024 * 1024,
-        backup_count: int = 5,
-        log_base_path: str | Path | None = None
-) -> None:
+def config_logging(level=logging.INFO,
+                   log_file: str | Path | None = 'logs/app.log',
+                   mask_sensitive_data: bool = True,
+                   max_bytes: int = 10 * 1024 * 1024,
+                   backup_count: int = 5,
+                   log_base_path: str | Path | None = None) -> None:
     log_format = '%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)4d | %(filename)s | %(funcName)s | %(message)s'
 
     root_logger = logging.getLogger()
@@ -161,7 +159,7 @@ def config_logging(
             file_handler.addFilter(SensitiveDataFilter())
         root_logger.addHandler(file_handler)
 
-    # === ПОДАВЛЯЕМ ШУМНЫЕ БИБЛИОТЕКИ ===
+    # ПОДАВЛЯЕМ ШУМНЫЕ БИБЛИОТЕКИ
     for noisy_logger in (
             "kafka",
             "kafka.conn",
@@ -185,3 +183,69 @@ def config_logging(
 
 
 logger = logging.getLogger(__name__)
+
+
+# В конец файла, ПОСЛЕ logger = logging.getLogger(__name__)
+
+def get_uvicorn_log_config(
+        level: str = "INFO",
+        log_file: str | Path | None = None,
+) -> dict:
+    """
+    Возвращает log_config для uvicorn.run()
+    в ЕДИНОМ формате проекта.
+    """
+    log_format = (
+        "%(asctime)s | %(levelname)-8s | %(name)s | "
+        "%(lineno)4d | %(filename)s | %(funcName)s | %(message)s"
+    )
+    date_format = "%Y-%m-%d %H:%M:%S"
+
+    handlers: dict = {
+        "console": {
+            "formatter": "default",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+        },
+    }
+    handler_names = ["console"]
+
+    if log_file:
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        handlers["file"] = {
+            "formatter": "default",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(log_path),
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+            "encoding": "utf-8",
+        }
+        handler_names.append("file")
+
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {
+                "format": log_format,
+                "datefmt": date_format,
+            },
+        },
+        "handlers": handlers,
+        "loggers": {
+            "uvicorn": {
+                "handlers": handler_names,
+                "level": level,
+                "propagate": False,
+            },
+            "uvicorn.error": {
+                "level": level,
+            },
+            "uvicorn.access": {
+                "handlers": handler_names,
+                "level": level,
+                "propagate": False,
+            },
+        },
+    }

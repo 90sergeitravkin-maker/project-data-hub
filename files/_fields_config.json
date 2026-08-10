@@ -1,21 +1,218 @@
 {
   "WEB-ASEANSTAT-WORLD_TRADE-1": [
-    "year","reporter_code"
-  ]
-  ,"API-COMTRADE-WORLD_TRADE-1": [
-    "reporter_code",
-    "period",
-    "dataset_checksum"
-  ]
-  ,"WEB-CUSTOMS_CHN-WORLD_TRADE-1": [
-    "period",
-    "trading_partner_code",
-    "locations_of_importers_and_exporters_code"
-  ]
-  ,"API-MACMAP-TARIFFS-1": [
-    "reporter_code", "year"
-  ]
-  ,"API-MACMAP-MEASURES-1": [
-    "reporter_code", "ntm_year"
-  ]
+    "year",
+    "reporter_code"
+  ],
+  "API-COMTRADE-WORLD_TRADE-1": {
+    "column": {
+      "hash_address": {
+        "type": "String",
+        "is_true": true
+      },
+      "type_code": {
+        "type": "String",
+        "is_true": true
+      },
+      "freq_code": {
+        "type": "String",
+        "is_true": true
+      },
+      "period": {
+        "type": "String",
+        "is_true": false
+      },
+      "reporter_code": {
+        "type": "Int64",
+        "is_true": false
+      },
+      "flow_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "partner_code": {
+        "type": "Int64",
+        "is_true": false
+      },
+      "partner2_code": {
+        "type": "Int64",
+        "is_true": false
+      },
+      "classification_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "cmd_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "ustoms_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "mos_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "mot_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "qty_unit_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "dataset_checksum": {
+        "type": "String",
+        "is_true": false
+      },
+      "ref_period_id": {
+        "type": "Int64",
+        "is_true": false
+      },
+      "ref_year": {
+        "type": "Int64",
+        "is_true": false
+      },
+      "ref_month": {
+        "type": "Int64",
+        "is_true": false
+      },
+      "reporter_iso": {
+        "type": "String",
+        "is_true": false
+      },
+      "reporter_desc": {
+        "type": "String",
+        "is_true": false
+      },
+      "flow_desc": {
+        "type": "String",
+        "is_true": false
+      },
+      "partner_iso": {
+        "type": "String",
+        "is_true": false
+      },
+      "partner_desc": {
+        "type": "String",
+        "is_true": false
+      },
+      "partner2_iso": {
+        "type": "String",
+        "is_true": false
+      },
+      "partner2_desc": {
+        "type": "String",
+        "is_true": false
+      },
+      "classification_search_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "is_original_classification": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "cmd_desc": {
+        "type": "String",
+        "is_true": false
+      },
+      "aggr_level": {
+        "type": "Int64",
+        "is_true": false
+      },
+      "is_leaf": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "customs_desc": {
+        "type": "String",
+        "is_true": false
+      },
+      "mot_desc": {
+        "type": "String",
+        "is_true": false
+      },
+      "qty_unit_abbr": {
+        "type": "String",
+        "is_true": false
+      },
+      "qty": {
+        "type": "Float64",
+        "is_true": false
+      },
+      "is_qty_estimated": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "alt_qty_unit_code": {
+        "type": "String",
+        "is_true": false
+      },
+      "alt_qty_unit_abbr": {
+        "type": "String",
+        "is_true": false
+      },
+      "alt_qty": {
+        "type": "Float64",
+        "is_true": false
+      },
+      "is_alt_qty_estimated": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "net_wgt": {
+        "type": "Float64",
+        "is_true": false
+      },
+      "is_net_wgt_estimated": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "gross_wgt": {
+        "type": "Float64",
+        "is_true": false
+      },
+      "is_gross_wgt_estimated": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "cifvalue": {
+        "type": "Float64",
+        "is_true": false
+      },
+      "fobvalue": {
+        "type": "Float64",
+        "is_true": false
+      },
+      "primary_value": {
+        "type": "Float64",
+        "is_true": false
+      },
+      "legacy_estimation_flag": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "is_reported": {
+        "type": "Bool",
+        "is_true": false
+      },
+      "is_aggregate": {
+        "type": "Bool"
+      }
+    },
+    "WEB-CUSTOMS_CHN-WORLD_TRADE-1": [
+      "period",
+      "trading_partner_code",
+      "locations_of_importers_and_exporters_code"
+    ],
+    "API-MACMAP-TARIFFS-1": [
+      "reporter_code",
+      "year"
+    ],
+    "API-MACMAP-MEASURES-1": [
+      "reporter_code",
+      "ntm_year"
+    ]
+  }
 }

@@ -9,7 +9,7 @@ from src.core.env_loader import get_env
 config = AppConfig.from_app_name(
     app_name="app_monitor",
     tag_name="APP Monitor",
-    db_alias="app_monitor",  # ← Алиас БД
+    db_alias="app_monitor",
 )
 
 # === Экспорт для обратной совместимости ===

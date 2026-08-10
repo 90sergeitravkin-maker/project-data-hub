@@ -1,18 +1,25 @@
 # src/back/app_ecomru/check_data/services.py
+import asyncio
 import os
+import uuid
+
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from src.core.logger import logger
+from src.core.kafka import kafka_client, InvalidMessageError
 from src.back.app_ecomru.config import DATA_FILE_RAW, DATA_FILE_TEMP, ALLOWED_PREFIXES
+from src.back.app_ecomru.check_data.config import PROCESS_FOLDER_RESULT_TOPIC
 from src.back.app_ecomru.check_data.file_manager import DuckDBFileManager
 
 
-def _validate_folder(
-        path: Path, *, require_read=False, require_write=False,
-        base_path: Path = DATA_FILE_RAW, check_inside_base=True,
-        allow_create_parent=False, must_not_equal=None
-) -> Dict[str, Any]:
+def _validate_folder(path: Path, *,
+                     require_read=False,
+                     require_write=False,
+                     base_path: Path = DATA_FILE_RAW,
+                     check_inside_base=True,
+                     allow_create_parent=False,
+                     must_not_equal=None) -> Dict[str, Any]:
     """(без изменений — ваш существующий код)"""
     if not path.exists():
         if allow_create_parent:

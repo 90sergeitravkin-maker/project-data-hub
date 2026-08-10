@@ -15,6 +15,14 @@ router = APIRouter(tags=[TAG_NAME])
 
 
 @router.get(
+    "/health",
+    summary="Health-check монитора",
+)
+async def health():
+    return {"status": "ok", "service": "app_monitor"}
+
+
+@router.get(
     "/report",
     response_model=AppsMemoryReport,
     summary="Сводный отчёт по RAM всех приложений (live)",
@@ -57,14 +65,6 @@ async def get_alerts(limit: int = Query(50, ge=1, le=500)):
 )
 async def get_diagnostics():
     return await MemoryMonitorService.get_full_diagnostics()
-
-
-@router.get(
-    "/health",
-    summary="Health-check монитора",
-)
-async def health():
-    return {"status": "ok", "service": "app_monitor"}
 
 
 @router.get("/disk-usage",

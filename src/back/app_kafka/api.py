@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, status
 
 from src.core.logger import logger
+from src.core.kafka_topics import get_topics_info, get_required_topics
 from src.back.app_kafka.services import kafka_service
 from src.back.app_kafka.config import TAG_NAME
 from src.back.app_kafka.schemas import (
@@ -22,6 +23,19 @@ async def kafka_health():
     if not result.get("available"):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=result)
     return result
+
+
+@router.get(
+    "/required-topics",
+    summary="Список топиков, необходимых для работы приложения"
+)
+async def get_required_topics_endpoint():
+    """Возвращает все топики, которые приложение использует."""
+    return {
+        "topics": get_topics_info(),
+        "names": get_required_topics(),
+        "count": len(get_required_topics()),
+    }
 
 
 @router.get(

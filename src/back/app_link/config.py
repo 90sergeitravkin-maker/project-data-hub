@@ -17,7 +17,7 @@ HOST = config.host
 PORT = config.port
 DB_ALIAS = config.db_alias
 APP_KAFKA_URL     = os.getenv("APP_KAFKA_URL", "http://127.0.0.1:8081/api/v1/app_kafka")
-KAFKA_TOPIC_LINKS = os.getenv("APP_LINK_KAFKA_TOPIC", "links-topic")
+KAFKA_TOPIC_LINKS = os.getenv("APP_LINK_KAFKA_TOPIC", "ecomru-links-topic")
 
 openapi_tags = {
     "name": TAG_NAME,

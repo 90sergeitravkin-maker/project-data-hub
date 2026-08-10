@@ -14,6 +14,7 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asyncio
 import argparse
@@ -30,6 +31,7 @@ from src.back.app_ecomru.config import (
     KAFKA_DOWNLOAD_TOPIC,
     APP_KAFKA_URL,
 )
+
 print(f"KAFKA_DOWNLOAD_TOPIC={KAFKA_DOWNLOAD_TOPIC}")
 print(f"APP_KAFKA_URL={APP_KAFKA_URL}")
 DATA_FILE = Path("files/comtrade.json")
@@ -71,11 +73,11 @@ def build_message_old(item: Dict[str, Any]) -> Dict[str, Any]:
     relative_path = "/".join(parts) if parts else "."
 
     return {
-        "url":           item.get("links", []),
+        "url": item.get("links", []),
         "relative_path": relative_path,
-        "entity":        entity,
-        "updated_at":    updated_at,
-        "period":        period,
+        "entity": entity,
+        "updated_at": updated_at,
+        "period": period,
     }
 
 
@@ -150,7 +152,7 @@ def main():
         logger.error(f"Файл не найден: {data_path}")
         sys.exit(1)
 
-    with open(data_path, "r", encoding="utf-8") as f:
+    with open(data_path, "r", encoding="utf-8-sig") as f:
         items = json.load(f)
 
     if not isinstance(items, list):

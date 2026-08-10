@@ -6,13 +6,13 @@
 """
 import os
 import time
+import psutil
 import asyncio
 import tracemalloc
+
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
-
-import psutil
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
 from src.core.logger import logger
 from src.database.manager import DBManager
@@ -377,27 +377,49 @@ class MemoryMonitorService:
                 logger.error(f"[MONITOR] snapshot_loop error: {e}", exc_info=True)
                 await asyncio.sleep(10)
 
-
     @classmethod
-    def get_disk_usage(cls, paths: List[str]) -> List[DiskUsageItem]:
-        import psutil
+    def get_disk_usage(cls, paths: List[str]) -> List[dict]:
+        """Получить размер места на диске. Возвращает список словарей (JSON-ready)."""
         result = []
+
+        # Находим общий префикс для всех путей, чтобы убрать его из отображения
+        if len(paths) > 1:
+            common_prefix = os.path.commonpath([os.path.normpath(p) for p in paths])
+        elif paths:
+            common_prefix = os.path.dirname(os.path.normpath(paths[0]))
+        else:
+            common_prefix = ""
+
         for path in paths:
             try:
-                # Нормализуем путь для Windows
                 normalized_path = os.path.normpath(path)
                 logger.info(f"[MONITOR] Проверка диска для пути: {normalized_path}")
+
                 if not os.path.exists(normalized_path):
                     logger.warning(f"[MONITOR] Путь не существует: {normalized_path}")
                     continue
+
                 usage = psutil.disk_usage(normalized_path)
-                result.append(DiskUsageItem(
-                    path=normalized_path,
-                    total_gb=round(usage.total / (1024**3), 2),
-                    used_gb=round(usage.used / (1024**3), 2),
-                    free_gb=round(usage.free / (1024**3), 2),
+
+                # Убираем общий префикс, оставляем только относительную часть
+                if common_prefix and normalized_path.startswith(common_prefix):
+                    display_path = normalized_path[len(common_prefix):].lstrip("\\").lstrip("/")
+                else:
+                    display_path = os.path.basename(normalized_path)
+
+                # Если получилось пусто — берём имя папки
+                if not display_path:
+                    display_path = os.path.basename(normalized_path)
+
+                item = DiskUsageItem(
+                    path=display_path,
+                    total_gb=round(usage.total / (1024 ** 3), 2),
+                    used_gb=round(usage.used / (1024 ** 3), 2),
+                    free_gb=round(usage.free / (1024 ** 3), 2),
                     percent=round(usage.percent, 1),
-                ))
+                )
+                result.append(item.model_dump())
             except Exception as e:
                 logger.warning(f"[MONITOR] Ошибка для пути {path}: {e}")
+
         return result
