@@ -19,8 +19,8 @@ class MailTracker:
             DB_ALIAS,
             """
             INSERT INTO app_mail.mail_tasks 
-            (task_id, to_email, subject, body_preview)
-            VALUES ($1, $2, $3, $4)
+            (task_id, to_email, subject, body_preview, status)
+            VALUES ($1, $2, $3, $4, 'new')
             """,
             task_id,
             data.get("to", ""),
