@@ -13,6 +13,7 @@ from src.core.secrets import SecureString
 
 # Определяем путь к .env (корень проекта)
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+print(ENV_PATH)
 if ENV_PATH.exists():
     load_dotenv(dotenv_path=ENV_PATH, override=True)
 

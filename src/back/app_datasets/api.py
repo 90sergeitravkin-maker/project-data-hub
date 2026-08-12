@@ -63,6 +63,10 @@ async def create_dataset(data: DataSetCreate, session: AsyncSession = Depends(ge
 
 @router.post("/scan-verified", summary="Сканировать папки")
 async def scan_verified_datasets():
+    """
+    1) добавление новых файлов
+    2) деактивация отсутствующих
+    """
     await DataSetsVerifiedServices.scan_and_save()
     await DataSetsVerifiedServices.check_and_update_missing_files(batch_size=1000)
     return {"status": "ok", "message": "Сканирование и сохранение завершены"}

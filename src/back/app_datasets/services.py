@@ -37,8 +37,9 @@ class DataSetsVerifiedServices:
     CRUD + сканирование файлов.
     """
 
-    # ==================== CRUD ====================
+    path_raw = DATA_FILE_EXT
 
+    # ==================== CRUD ====================
     @staticmethod
     async def create(session: AsyncSession, data: DataSetCreate) -> DataSetResponse:
         """Создание записи через ORM."""
@@ -126,10 +127,10 @@ class DataSetsVerifiedServices:
         query = text("""
             WITH bt AS (
                 SELECT
-                    name                                                   AS "name",
-                    period                                                 AS "period",
-                    COALESCE((validation::jsonb ->> 'file_size')::bigint, 0) AS "size",
-                    COALESCE((validation::jsonb ->> 'row_count')::bigint, 0) AS "rows"
+                     name                                                     AS "name"
+                    ,period                                                   AS "period"
+                    ,COALESCE((validation::jsonb ->> 'file_size')::bigint, 0) AS "size"
+                    ,COALESCE((validation::jsonb ->> 'row_count')::bigint, 0) AS "rows"
                 FROM app_datasets.dim_data_sets_verified
                 WHERE 1=1
                   AND name = :name_filter
@@ -137,10 +138,10 @@ class DataSetsVerifiedServices:
                   AND is_active = TRUE
             )
             SELECT
-                name        AS name,
-                period      AS period,
-                SUM("size") AS size,
-                SUM("rows") AS rows
+                 name        AS name
+                ,period      AS period
+                ,SUM("size") AS size
+                ,SUM("rows") AS rows
             FROM bt
             GROUP BY name, period
             ORDER BY name, period
@@ -157,8 +158,6 @@ class DataSetsVerifiedServices:
         ]
 
     # ==================== Сканирование файлов ====================
-
-    path_raw = DATA_FILE_EXT
 
     @staticmethod
     def _get_all_file(
@@ -324,6 +323,14 @@ class DataSetsVerifiedServices:
     @classmethod
     async def scan_and_save(cls) -> None:
         """Сканирование папки и сохранение метаданных."""
+
+        import os
+        logger.info(f"[SCAN] path_raw = {cls.path_raw!r}")
+        logger.info(f"[SCAN] ENV APP_FAIL_MANAGER_EXT = {os.getenv('APP_FAIL_MANAGER_EXT')!r}")
+        logger.info(f"[SCAN] ENV APP_FAIL_MANAGER_RAW = {os.getenv('APP_FAIL_MANAGER_RAW')!r}")
+        logger.info(f"[SCAN] CWD = {Path.cwd()!r}")
+
+
         raw_path = Path(cls.path_raw)
         if not raw_path.exists():
             raise FileNotFoundError(f"Директория не найдена: {raw_path}")
@@ -474,6 +481,7 @@ class DataSetsVerifiedServices:
             row_count = await loop.run_in_executor(None, cls._get_row_count, file_path)
         except Exception:
             row_count = None
+
         result = {
             "hash_sum": hash_sum,
             "is_active": True,

@@ -137,11 +137,11 @@ if __name__ == "__main__":
     uvicorn.run(
         "src.main:app",
         host="127.0.0.1",
-        port=8080,
+        port=8000,
         reload=True,
         log_level=SERVICE_LOG_LEVEL.lower(),
         access_log=True,
-        log_config=get_uvicorn_log_config(  # ← ДОБАВЛЕНО
+        log_config=get_uvicorn_log_config(
             level=SERVICE_LOG_LEVEL,
             log_file=LOG_FILE,
         ),
