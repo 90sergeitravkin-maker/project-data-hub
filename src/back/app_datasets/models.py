@@ -24,18 +24,9 @@ class DataSetsVerified(Base):
     __tablename__ = "dim_data_sets_verified"
     __table_args__ = TABLE_ARGS
 
-    # Переопределяем id из Base: nullable, НЕ PK
-    id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-
-    # PK — hash_sum
     hash_sum: Mapped[str] = mapped_column(
         String(64), primary_key=True, autoincrement=False
     )
-
-    # Убираем стандартные created_at / updated_at из Base
-    created_at = None
-    updated_at = None
-
     date_created: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         server_default=func.current_timestamp(),

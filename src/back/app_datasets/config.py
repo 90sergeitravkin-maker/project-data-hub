@@ -21,8 +21,7 @@ PORT = config.port
 DB_ALIAS = config.db_alias
 
 CONFIG_PATH = Path(get_env("APP_DATASET_CONFIG_PATH", "files/_fields_config.json"))
-DATA_FILE_EXT = Path(get_env("APP_FILE_MANAGER_EXT", ""))
-
+DATA_FILE_EXT = Path(get_env("APP_FAIL_MANAGER_EXT", ""))
 openapi_tags = {
     "name": TAG_NAME,
     "description": "Хранение метаданных источников данных",

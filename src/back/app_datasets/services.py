@@ -391,9 +391,7 @@ class DataSetsVerifiedServices:
             await cls._save_result(result, error=error)
 
     @classmethod
-    async def check_and_update_missing_files(
-            cls, batch_size: int = 1
-    ) -> Dict[str, int]:
+    async def check_and_update_missing_files(cls, batch_size: int = 1) -> Dict[str, int]:
         """Проверка наличия файлов для активных записей."""
         db_manager = DBManager()
         total_checked = 0
@@ -443,13 +441,11 @@ class DataSetsVerifiedServices:
         }
 
     @classmethod
-    async def save_file_metadata(
-            cls,
-            file_path: Path,
-            entity: Optional[str] = None,
-            period: Optional[str] = None,
-            updated_at: Optional[str] = None,
-    ) -> None:
+    async def save_file_metadata(cls,
+                                 file_path: Path,
+                                 entity: Optional[str] = None,
+                                 period: Optional[str] = None,
+                                 updated_at: Optional[str] = None) -> None:
         """Сохраняет информацию об одном файле (используется app_ecomru)."""
         loop = asyncio.get_running_loop()
         try:
@@ -480,11 +476,11 @@ class DataSetsVerifiedServices:
             row_count = None
         result = {
             "hash_sum": hash_sum,
+            "is_active": True,
             "name": entity,
             "period": period,
             "upload_date": updated_at,
             "link": str(file_path),
             "validation": {"file_size": size, "row_count": row_count},
-            "is_active": True,
         }
         await cls._save_result(result, error=None)

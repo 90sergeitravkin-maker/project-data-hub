@@ -1,4 +1,74 @@
 {
+  "WEB-CUSTOMS_CHN-WORLD_TRADE-1": {
+    "processing": {
+      "split_columns": [
+        "trading_partner_code",
+        "period"
+      ]
+    },
+    "column": {
+      "flow": {
+        "type": "String",
+        "is_true": true
+      },
+      "currency": {
+        "type": "String",
+        "is_true": true
+      },
+      "quantity": {
+        "type": "Int64",
+        "is_true": true
+      },
+      "unit": {
+        "type": "String",
+        "is_true": true
+      },
+      "supplementary_quantity": {
+        "type": "String",
+        "is_true": true
+      },
+      "supplementary_unit": {
+        "type": "String",
+        "is_true": true
+      },
+      "year": {
+        "type": "Int8",
+        "is_true": true
+      },
+      "period": {
+        "type": "Int8",
+        "is_true": true
+      },
+      "commodity_code": {
+        "type": "String",
+        "is_true": true
+      },
+      "commodity": {
+        "type": "String",
+        "is_true": true
+      },
+      "trading_partner_code": {
+        "type": "String",
+        "is_true": true
+      },
+      "trading_partner": {
+        "type": "String",
+        "is_true": true
+      },
+      "locations_of_importers_and_exporters_code": {
+        "type": "String",
+        "is_true": true
+      },
+      "locations_of_importers_and_exporters": {
+        "type": "String",
+        "is_true": true
+      },
+      "hash_address": {
+        "type": "String",
+        "is_true": true
+      }
+    }
+  },
   "WEB-ASEANSTAT-WORLD_TRADE-1": [
     "year",
     "reporter_code"
