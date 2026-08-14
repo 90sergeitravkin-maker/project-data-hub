@@ -60,9 +60,10 @@ def get_split_columns(entity: str) -> List[str]:
     """
     Возвращает список столбцов для разбиения по entity (hot-reload).
 
-    Поддерживает два формата в _fields_config.json:
-      1. Простой список:  {"ENTITY": ["col1", "col2"]}
-      2. Объект:          {"ENTITY": {"processing": {"split_column": ["col1"]}}}
+    Поддерживает форматы:
+      1. Список:           {"ENTITY": ["col1", "col2"]}
+      2. Объект:           {"ENTITY": {"processing": {"split_columns": ["col1", "col2"]}}}
+      3. Одиночный столбец: {"ENTITY": {"processing": {"split_column": "col1"}}}
     """
     if not entity:
         return []
@@ -77,16 +78,22 @@ def get_split_columns(entity: str) -> List[str]:
     if isinstance(entity_cfg, list):
         return [c for c in entity_cfg if isinstance(c, str) and c]
 
-    # Формат 2: объект с processing.split_column
+    # Формат 2: объект с processing
     if isinstance(entity_cfg, dict):
         processing = entity_cfg.get("processing", {})
         if isinstance(processing, dict):
-            cols = processing.get("split_columns", [])
+            # Вариант: split_columns (список)
+            cols = processing.get("split_columns")
             if isinstance(cols, list):
                 return [c for c in cols if isinstance(c, str) and c]
             if isinstance(cols, str) and cols:
                 return [cols]
-
+            # Вариант: split_column (одиночный)
+            col = processing.get("split_column")
+            if isinstance(col, str) and col:
+                return [col]
+            if isinstance(col, list):
+                return [c for c in col if isinstance(c, str) and c]
     return []
 
 
