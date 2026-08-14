@@ -1,4 +1,4 @@
-# src/back/app_ecomru/check_data/config.py
+# src/back/app_ecomru/split_data/config.py
 import os
 from src.core.env_loader import get_env
 

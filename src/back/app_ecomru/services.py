@@ -193,7 +193,7 @@ async def handle_verification_task(task: Dict[str, Any]) -> None:
     elif split_columns:
         try:
             # Импорт внутри функции, чтобы избежать циклических импортов
-            from src.back.app_ecomru.check_data.services import process_data_folder
+            from src.back.app_ecomru.split_data.services import process_data_folder
 
             # Передаём СПИСОК столбцов
             result = await asyncio.to_thread(process_data_folder, folder_path, split_columns)

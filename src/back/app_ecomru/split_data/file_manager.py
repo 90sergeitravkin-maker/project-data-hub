@@ -1,4 +1,4 @@
-# src/back/app_ecomru/check_data/file_manager.py
+# src/back/app_ecomru/split_data/file_manager.py
 import os
 import shutil
 import duckdb

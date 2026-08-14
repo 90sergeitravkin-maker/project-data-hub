@@ -1,4 +1,4 @@
-#  src/back/app_ecomru/check_data/schemas.py
+#  src/back/app_ecomru/split_data/schemas.py
 from typing import Optional
 
 from pydantic import BaseModel

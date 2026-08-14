@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from src.back.app_ecomru.site import SiteApi
 from src.back.app_ecomru.config import TAG_NAME
-from src.back.app_ecomru.check_data.services import process_data_folder as process_data_folder_sync
+from src.back.app_ecomru.split_data.services import process_data_folder as process_data_folder_sync
 from src.core.logger import logger
 
 router = APIRouter(tags=[TAG_NAME])

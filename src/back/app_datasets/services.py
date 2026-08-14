@@ -76,9 +76,7 @@ class DataSetsVerifiedServices:
         return DataSetResponse.model_validate(db_dataset)
 
     @staticmethod
-    async def get_all(
-            session: AsyncSession, skip: int = 0, limit: int = 100
-    ) -> list[DataSetResponse]:
+    async def get_all(session: AsyncSession, skip: int = 0, limit: int = 100) -> list[DataSetResponse]:
         """Список записей с пагинацией."""
         result = await session.execute(
             select(DataSetsVerified).offset(skip).limit(limit)
@@ -86,9 +84,7 @@ class DataSetsVerifiedServices:
         return [DataSetResponse.model_validate(ds) for ds in result.scalars().all()]
 
     @staticmethod
-    async def update(
-            session: AsyncSession, hash_sum: str, data: DataSetUpdate
-    ) -> DataSetResponse:
+    async def update(session: AsyncSession, hash_sum: str, data: DataSetUpdate) -> DataSetResponse:
         """Частичное обновление записи по hash_sum."""
         result = await session.execute(
             select(DataSetsVerified).where(DataSetsVerified.hash_sum == hash_sum)
@@ -117,12 +113,8 @@ class DataSetsVerifiedServices:
         return DataSetResponse.model_validate(result.scalar_one())
 
     @staticmethod
-    async def aggregate_by_name(
-            session: AsyncSession,
-            name_filter: str,
-            skip: int = 0,
-            limit: int = 100,
-    ) -> list[DataSetAggregateResponse]:
+    async def aggregate_by_name(session: AsyncSession, name_filter: str, skip: int = 0, limit: int = 100, ) -> list[
+        DataSetAggregateResponse]:
         """Агрегация данных по name и period."""
         query = text("""
             WITH bt AS (
@@ -160,10 +152,8 @@ class DataSetsVerifiedServices:
     # ==================== Сканирование файлов ====================
 
     @staticmethod
-    def _get_all_file(
-            folder_path: Union[str, Path] = None,
-            extensions: Union[str, List[str]] = "*",
-    ) -> Generator[Path, None, None]:
+    def _get_all_file(folder_path: Union[str, Path] = None, extensions: Union[str, List[str]] = "*", ) -> Generator[
+        Path, None, None]:
         path = Path(folder_path or DataSetsVerifiedServices.path_raw)
         if not path.exists():
             raise FileNotFoundError(f"Директория не найдена: {folder_path}")
@@ -275,9 +265,10 @@ class DataSetsVerifiedServices:
             raise
 
     @classmethod
-    def _load_source_fields_config(
-            cls, config_path: Optional[Path] = None
-    ) -> Dict[str, List[str]]:
+    def _load_source_fields_config(cls, config_path: Optional[Path] = None) -> Dict[str, List[str]]:
+        """
+        Загрузка json конфигурации
+        """
         if config_path is None:
             config_path = CONFIG_PATH
         try:
@@ -292,9 +283,7 @@ class DataSetsVerifiedServices:
             return {}
 
     @staticmethod
-    def _get_distinct_values(
-            file_path: Union[str, Path], field: str
-    ) -> Optional[List[Any]]:
+    def _get_distinct_values(file_path: Union[str, Path], field: str) -> Optional[List[Any]]:
         path = Path(file_path)
         if not path.is_file():
             return None
@@ -319,83 +308,6 @@ class DataSetsVerifiedServices:
                 f"Не удалось получить уникальные значения для поля {field} из {file_path}: {e}"
             )
             return None
-
-    @classmethod
-    async def scan_and_save(cls) -> None:
-        """Сканирование папки и сохранение метаданных."""
-
-        import os
-        logger.info(f"[SCAN] path_raw = {cls.path_raw!r}")
-        logger.info(f"[SCAN] ENV APP_FAIL_MANAGER_EXT = {os.getenv('APP_FAIL_MANAGER_EXT')!r}")
-        logger.info(f"[SCAN] ENV APP_FAIL_MANAGER_RAW = {os.getenv('APP_FAIL_MANAGER_RAW')!r}")
-        logger.info(f"[SCAN] CWD = {Path.cwd()!r}")
-
-
-        raw_path = Path(cls.path_raw)
-        if not raw_path.exists():
-            raise FileNotFoundError(f"Директория не найдена: {raw_path}")
-        loop = asyncio.get_running_loop()
-        files = await loop.run_in_executor(None, list, cls._get_all_file())
-        source_config = cls._load_source_fields_config()
-        for i_file in files:
-            result = {
-                "hash_sum": None,
-                "name": None,
-                "period": None,
-                "upload_date": None,
-                "link": str(i_file),
-                "validation": {},
-                "is_active": True,
-            }
-            error = None
-            try:
-                metadata = await loop.run_in_executor(None, cls._extract_metadata, i_file)
-                result["name"] = metadata.get("source")
-                result["period"] = metadata.get("period")
-                result["upload_date"] = metadata.get("date")
-                try:
-                    result["hash_sum"] = await loop.run_in_executor(
-                        None, cls._get_hash_file, i_file
-                    )
-                except Exception as e:
-                    result["hash_sum"] = hashlib.sha256(str(i_file).encode()).hexdigest()
-                    error = f"Ошибка вычисления хеша: {e}"
-                result["validation"]["file_size"] = await loop.run_in_executor(
-                    None, cls._get_file_size, i_file
-                )
-                try:
-                    row_count = await loop.run_in_executor(
-                        None, cls._get_row_count, i_file
-                    )
-                    result["validation"]["row_count"] = row_count
-                except Exception as e:
-                    result["validation"]["row_count"] = None
-                    if not error:
-                        error = f"Ошибка подсчёта строк: {e}"
-                source = metadata.get("source")
-                if source and source_config:
-                    fields = source_config.get(source, [])
-                    if fields:
-                        logger.debug(f"Для источника {source} обрабатываются поля: {fields}")
-                        distinct_values = {}
-                        for field in fields:
-                            try:
-                                values = await loop.run_in_executor(
-                                    None, cls._get_distinct_values, i_file, field
-                                )
-                                if values is not None:
-                                    distinct_values[field] = values
-                            except Exception as e:
-                                logger.debug(
-                                    f"Ошибка получения уникальных значений для поля {field}: {e}"
-                                )
-                        if distinct_values:
-                            result["validation"]["distinct_values"] = distinct_values
-            except Exception as e:
-                error = str(e)
-                if not result["hash_sum"]:
-                    result["hash_sum"] = hashlib.sha256(str(i_file).encode()).hexdigest()
-            await cls._save_result(result, error=error)
 
     @classmethod
     async def check_and_update_missing_files(cls, batch_size: int = 1) -> Dict[str, int]:
@@ -492,3 +404,180 @@ class DataSetsVerifiedServices:
             "validation": {"file_size": size, "row_count": row_count},
         }
         await cls._save_result(result, error=None)
+
+    @classmethod
+    async def get_split_columns(cls, source_name: str):
+        """
+        Извлекает список столбцов для разбиения из конфигурации полей источников.
+
+        Args:
+            source_name: Имя источника (entity), например "API-COMTRADE-WORLD_TRADE-1"
+
+        Returns:
+            List[str] | None: Список столбцов или None, если не задано.
+        """
+        config = cls._load_source_fields_config()
+        source = config.get(source_name)
+        if isinstance(source, dict):
+            processing = source.get("processing")
+            if isinstance(processing, dict):
+                return processing.get("split_columns")
+        return None
+
+    @staticmethod
+    def _get_distinct_combinations(file_path: Union[str, Path], columns: List[str]) -> List[tuple]:
+        """
+        Возвращает список уникальных комбинаций значений для указанных столбцов.
+        Использует DuckDB для чтения данных.
+        """
+        path = Path(file_path)
+        if not path.is_file():
+            return []
+        safe_path = path.as_posix().replace("'", "''")
+        suffixes = path.suffixes
+
+        # Определяем функцию чтения в зависимости от расширения
+        if ".parquet" in suffixes:
+            table_expr = f"read_parquet('{safe_path}')"
+        elif ".json" in suffixes:
+            table_expr = f"read_json_auto('{safe_path}')"
+        elif ".csv" in suffixes:
+            table_expr = f"read_csv_auto('{safe_path}')"
+        else:
+            return []
+
+        # Экранируем имена столбцов (защита от SQL-инъекций)
+        safe_columns = [f'"{col.replace('"', '""')}"' for col in columns]
+        columns_str = ", ".join(safe_columns)
+
+        query = f"SELECT DISTINCT {columns_str} FROM {table_expr}"
+        try:
+            with duckdb.connect() as conn:
+                # Ограничим количество результатов, чтобы избежать перегрузки (можно убрать LIMIT при необходимости)
+                result = conn.execute(query).fetchall()
+                return result  # список кортежей
+        except Exception as e:
+            logger.debug(f"Не удалось получить уникальные комбинации для {columns} из {file_path}: {e}")
+            return []
+
+    @classmethod
+    async def scan_and_save(cls) -> None:
+        """Сканирование папки и сохранение метаданных."""
+        import os
+        logger.info(f"[SCAN] path_raw = {cls.path_raw!r}")
+        logger.info(f"[SCAN] ENV APP_FAIL_MANAGER_EXT = {os.getenv('APP_FAIL_MANAGER_EXT')!r}")
+        logger.info(f"[SCAN] ENV APP_FAIL_MANAGER_RAW = {os.getenv('APP_FAIL_MANAGER_RAW')!r}")
+        logger.info(f"[SCAN] CWD = {Path.cwd()!r}")
+
+        raw_path = Path(cls.path_raw)
+        if not raw_path.exists():
+            raise FileNotFoundError(f"Директория не найдена: {raw_path}")
+
+        loop = asyncio.get_running_loop()
+        files = await loop.run_in_executor(None, list, cls._get_all_file())
+        source_config = cls._load_source_fields_config()
+        logger.info(f"[SCAN] source_config loaded, keys: {list(source_config.keys())}")
+
+        for i_file in files:
+            result = {
+                "hash_sum": None,
+                "name": None,
+                "period": None,
+                "upload_date": None,
+                "link": str(i_file),
+                "validation": {},
+                "is_active": True,
+            }
+            error = None
+            try:
+                metadata = await loop.run_in_executor(None, cls._extract_metadata, i_file)
+                result["name"] = metadata.get("source")
+                result["period"] = metadata.get("period")
+                result["upload_date"] = metadata.get("date")
+
+                # Хеш
+                try:
+                    result["hash_sum"] = await loop.run_in_executor(None, cls._get_hash_file, i_file)
+                except Exception as e:
+                    result["hash_sum"] = hashlib.sha256(str(i_file).encode()).hexdigest()
+                    error = f"Ошибка вычисления хеша: {e}"
+
+                # Размер и количество строк
+                result["validation"]["file_size"] = await loop.run_in_executor(None, cls._get_file_size, i_file)
+                try:
+                    row_count = await loop.run_in_executor(None, cls._get_row_count, i_file)
+                    result["validation"]["row_count"] = row_count
+                except Exception as e:
+                    result["validation"]["row_count"] = None
+                    if not error:
+                        error = f"Ошибка подсчёта строк: {e}"
+
+                source = metadata.get("source")
+                logger.info(f"[SCAN] source = {source}, file = {i_file.name}")
+                if source and source_config:
+                    source_cfg = source_config.get(source)
+                    logger.info(f"[SCAN] source_cfg = {source_cfg}")
+
+                    if isinstance(source_cfg, dict):
+                        split_columns = None
+                        processing = source_cfg.get("processing")
+                        if isinstance(processing, dict):
+                            split_columns = processing.get("split_columns")
+                        if not split_columns:
+                            split_columns = source_cfg.get("split_columns")  # на верхнем уровне
+
+                        if split_columns:
+                            logger.info(f"[SCAN] Найдены split_columns: {split_columns}")
+                            combinations = await loop.run_in_executor(
+                                None, cls._get_distinct_combinations, i_file, split_columns
+                            )
+                            logger.info(f"[SCAN] Получено комбинаций: {len(combinations) if combinations else 0}")
+                            if combinations:
+                                result["validation"]["split_combinations"] = combinations
+                                result["validation"]["split_combinations_count"] = len(combinations)
+                            else:
+                                result["validation"]["split_combinations"] = []
+                                result["validation"]["split_combinations_count"] = 0
+                        else:
+                            logger.info(f"[SCAN] split_columns не найдены для источника {source}")
+
+                        # 2. Если есть список полей для distinct_values (старый формат)
+                        fields = source_cfg.get("fields") or source_cfg.get("distinct_fields")
+                        if fields and isinstance(fields, list):
+                            logger.debug(f"Для источника {source} обрабатываются поля: {fields}")
+                            distinct_values = {}
+                            for field in fields:
+                                try:
+                                    values = await loop.run_in_executor(
+                                        None, cls._get_distinct_values, i_file, field
+                                    )
+                                    if values is not None:
+                                        distinct_values[field] = values
+                                except Exception as e:
+                                    logger.debug(f"Ошибка получения уникальных значений для поля {field}: {e}")
+                            if distinct_values:
+                                result["validation"]["distinct_values"] = distinct_values
+
+                    elif isinstance(source_cfg, list):
+                        fields = source_cfg
+                        if fields:
+                            logger.debug(f"Для источника {source} обрабатываются поля: {fields}")
+                            distinct_values = {}
+                            for field in fields:
+                                try:
+                                    values = await loop.run_in_executor(
+                                        None, cls._get_distinct_values, i_file, field
+                                    )
+                                    if values is not None:
+                                        distinct_values[field] = values
+                                except Exception as e:
+                                    logger.debug(f"Ошибка получения уникальных значений для поля {field}: {e}")
+                            if distinct_values:
+                                result["validation"]["distinct_values"] = distinct_values
+
+            except Exception as e:
+                error = str(e)
+                if not result["hash_sum"]:
+                    result["hash_sum"] = hashlib.sha256(str(i_file).encode()).hexdigest()
+
+            await cls._save_result(result, error=error)

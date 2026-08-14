@@ -69,14 +69,14 @@ def get_topics_info() -> List[Dict[str, Any]]:
             "name": get_env("APP_ECOMRU_KAFKA_TOPIC_PROCESS_FOLDER", "ecomru-process-folder"),
             "group_id": get_env("APP_ECOMRU_KAFKA_GROUP_ID_PROCESS_FOLDER", "ecomru-process-folder-group"),
             "role": "consumer",
-            "app": "app_ecomru.check_data",
+            "app": "app_ecomru.split_data",
             "description": "Задачи на обработку папок (разбиение по столбцу)",
         },
         {
             "name": get_env("APP_ECOMRU_KAFKA_TOPIC_PROCESS_FOLDER_RESULT", "ecomru-process-folder-result"),
             "group_id": None,
             "role": "producer",
-            "app": "app_ecomru.check_data",
+            "app": "app_ecomru.split_data",
             "description": "Результаты обработки папок",
         },
         {

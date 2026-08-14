@@ -22,8 +22,8 @@ from src.core.kafka import kafka_client
 from src.core.kafka_admin import ensure_topics
 from src.core.kafka_topics import get_required_topics
 from src.core.env_loader import get_env
-from src.back.app_ecomru.check_data.config import PROCESS_FOLDER_TOPIC, PROCESS_FOLDER_GROUP_ID
-from src.back.app_ecomru.check_data.services import handle_process_folder_task
+from src.back.app_ecomru.split_data.config import PROCESS_FOLDER_TOPIC, PROCESS_FOLDER_GROUP_ID
+from src.back.app_ecomru.split_data.services import handle_process_folder_task
 from src.back.app_ecomru.services import handle_download_task, handle_verification_task
 from src.back.app_ecomru.config import (
     ensure_storage_ready,

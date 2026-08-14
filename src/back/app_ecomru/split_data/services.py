@@ -1,4 +1,4 @@
-# src/back/app_ecomru/check_data/services.py
+# src/back/app_ecomru/split_data/services.py
 import asyncio
 import os
 import uuid
@@ -11,8 +11,8 @@ from src.back.app_ecomru.config import (
     DATA_FILE_RAW, DATA_FILE_TEMP,
     get_allowed_prefixes, get_split_columns,
 )
-from src.back.app_ecomru.check_data.config import PROCESS_FOLDER_RESULT_TOPIC
-from src.back.app_ecomru.check_data.file_manager import DuckDBFileManager
+from src.back.app_ecomru.split_data.config import PROCESS_FOLDER_RESULT_TOPIC
+from src.back.app_ecomru.split_data.file_manager import DuckDBFileManager
 
 
 # ИСПРАВЛЕНО: добавлено подчеркивание, чтобы совпадало с вызовами ниже

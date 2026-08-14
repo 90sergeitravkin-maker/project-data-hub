@@ -20,7 +20,14 @@ HOST = config.host
 PORT = config.port
 DB_ALIAS = config.db_alias
 
-CONFIG_PATH = Path(get_env("APP_DATASET_CONFIG_PATH", "files/_fields_config.json"))
+# --- ИСПРАВЛЕНИЕ ПУТИ ---
+# Поднимаемся на 3 уровня вверх: src/back/app_datasets/config.py -> корень проекта
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "files" / "_fields_config.json"
+CONFIG_PATH = Path(get_env("APP_DATASET_CONFIG_PATH", str(DEFAULT_CONFIG_PATH)))
+print(CONFIG_PATH)
+# -------------------------
+
 DATA_FILE_EXT = Path(get_env("APP_FAIL_MANAGER_EXT", ""))
 openapi_tags = {
     "name": TAG_NAME,
