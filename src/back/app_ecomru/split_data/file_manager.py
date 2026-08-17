@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Generator
 
 from src.core.logger import logger
-from src.back.app_ecomru.config import DATA_FILE_RAW, DATA_FILE_TEMP, MAX_FILE_SIZE
+from src.back.app_ecomru.config import DATA_FILE_RAW, DATA_FILE_TEST, MAX_FILE_SIZE
 
 
 class DuckDBFileManager:
@@ -24,13 +24,13 @@ class DuckDBFileManager:
         """
         Инициализация менеджера.
 
-        :param raw_dir: Корневая директория с исходными данными (если None – используется DATA_FILE_RAW)
-        :param test_dir: Корневая директория для результатов (если None – используется DATA_FILE_TEMP)
+        :param raw_dir:       Корневая директория с исходными данными (если None – используется DATA_FILE_RAW)
+        :param test_dir:      Корневая директория для результатов     (если None – используется DATA_FILE_TEST)
         :param max_file_size: Максимальный размер файла при разбиении (если None – используется MAX_FILE_SIZE)
         """
-        self.raw_dir = Path(raw_dir) if raw_dir else DATA_FILE_RAW
-        self.test_dir = Path(test_dir) if test_dir else DATA_FILE_TEMP
-        self.max_file_size = max_file_size if max_file_size is not None else MAX_FILE_SIZE
+        self.raw_dir       = Path(raw_dir)  if raw_dir  else DATA_FILE_RAW
+        self.test_dir      = Path(test_dir) if test_dir else DATA_FILE_TEST
+        self.max_file_size = max_file_size  if max_file_size is not None else MAX_FILE_SIZE
 
     # ---------- Вспомогательные методы работы с папками ----------
     @staticmethod

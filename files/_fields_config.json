@@ -1,11 +1,5 @@
 {
   "WEB-CUSTOMS_CHN-WORLD_TRADE-1": {
-    "processing": {
-      "split_columns": [
-        "trading_partner_code",
-        "period"
-      ]
-    },
     "column": {
       "flow": {
         "type": "String",
@@ -69,10 +63,12 @@
       }
     }
   },
-  "WEB-ASEANSTAT-WORLD_TRADE-1": [
-    "year",
-    "reporter_code"
-  ],
+  "WEB-ASEANSTAT-WORLD_TRADE-1": {
+    "processing": {},
+    "column": {
+      "1": 1
+    }
+  },
   "API-COMTRADE-WORLD_TRADE-1": {
     "processing": {
       "split_columns": [

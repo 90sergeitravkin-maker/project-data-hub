@@ -8,7 +8,7 @@ from typing import Dict, Any, List, Union
 from src.core.logger import logger
 from src.core.kafka import kafka_client, InvalidMessageError
 from src.back.app_ecomru.config import (
-    DATA_FILE_RAW, DATA_FILE_TEMP,
+    DATA_FILE_RAW, DATA_FILE_TEST,
     get_allowed_prefixes, get_split_columns,
 )
 from src.back.app_ecomru.split_data.config import PROCESS_FOLDER_RESULT_TOPIC
@@ -106,9 +106,9 @@ def process_data_folder(
     except ValueError:
         return {"status": "error", "error": f"Путь {raw_folder} вне DATA_FILE_RAW"}
 
-    target_folder = DATA_FILE_TEMP / rel_path
+    target_folder = DATA_FILE_TEST / rel_path
     target_check = _validate_folder(
-        target_folder, require_write=True, base_path=DATA_FILE_TEMP,
+        target_folder, require_write=True, base_path=DATA_FILE_TEST,
         check_inside_base=False, allow_create_parent=True, must_not_equal=raw_folder
     )
     if "error" in target_check:
@@ -137,7 +137,7 @@ def process_data_folder(
         rel_paths = []
         for p in abs_paths:
             try:
-                rel = Path(p).relative_to(DATA_FILE_TEMP)
+                rel = Path(p).relative_to(DATA_FILE_TEST)
                 rel_paths.append(rel.as_posix())
             except ValueError:
                 rel_paths.append(p)

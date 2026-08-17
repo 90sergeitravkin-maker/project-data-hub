@@ -12,16 +12,16 @@ config = AppConfig.from_app_name(
 # === Три корневые директории (для web_file_manager) ===
 DATA_ROOT_EXT  = Path(get_env("APP_FAIL_MANAGER_EXT",  "-")).resolve()
 DATA_ROOT_RAW  = Path(get_env("APP_FAIL_MANAGER_RAW",  "-")).resolve()
-DATA_ROOT_TEMP = Path(get_env("APP_FAIL_MANAGER_TEMP", "-")).resolve()
+DATA_ROOT_TEMP = Path(get_env("APP_FAIL_MANAGER_TEST", "-")).resolve()
 
 # Для обратной совместимости (используется в app_file_manager API)
 DATA_ROOT_DIR = DATA_ROOT_EXT
 
 # Реестр доступных корней (whitelist — безопасность)
 AVAILABLE_ROOTS = {
-    "ext":  {"path": DATA_ROOT_EXT,  "label": "📦 External (EXT)",  "env": "APP_FAIL_MANAGER_EXT"},
-    "raw":  {"path": DATA_ROOT_RAW,  "label": "🗂 Raw (RAW)",       "env": "APP_FAIL_MANAGER_RAW"},
-    "temp": {"path": DATA_ROOT_TEMP, "label": "🧪 Temp (TEST)",     "env": "APP_FAIL_MANAGER_TEMP"},
+    "ext":  {"path": DATA_ROOT_EXT,  "label": "📦 External", "env": "APP_FAIL_MANAGER_EXT" },
+    "raw":  {"path": DATA_ROOT_RAW,  "label": "🗂 Raw",       "env": "APP_FAIL_MANAGER_RAW" },
+    "temp": {"path": DATA_ROOT_TEMP, "label": "🧪 Test",     "env": "APP_FAIL_MANAGER_TEST"},
 }
 
 # === Токены ===

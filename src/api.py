@@ -26,7 +26,7 @@ def _collect_app_openapi_tags() -> List[Dict[str, str]]:
     apps = [
         # === Backend ===
         ("app_monitor",        "src.back.app_monitor.config"),
-        ("app_users",           "src.back.app_users.config"),
+        ("app_users",          "src.back.app_users.config"),
         ("app_mail",           "src.back.app_mail.config"),
         ("app_ecomru",         "src.back.app_ecomru.config"),
         ("app_file_manager",   "src.back.app_file_manager.config"),

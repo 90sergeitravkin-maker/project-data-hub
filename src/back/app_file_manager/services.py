@@ -159,16 +159,13 @@ class AppDataChecker:
             raise ValueError(f"Ошибка формата CSV/TXT: {e}")
 
     # === Сканирование директорий ===
-    # src/back/app_file_manager/download.py
 
     @staticmethod
-    async def get_available_folders(
-            root_dir: Path,
-            folder_path: Optional[str] = None,
-            pattern: Optional[str] = None,
-            page: int = 1,
-            page_size: int = 50
-    ) -> Tuple[bool, Dict[str, Any]]:
+    async def get_available_folders(root_dir: Path,
+                                    folder_path: Optional[str] = None,
+                                    pattern: Optional[str] = None,
+                                    page: int = 1,
+                                    page_size: int = 50) -> Tuple[bool, Dict[str, Any]]:
         try:
             if not root_dir or not root_dir.exists() or not root_dir.is_dir():
                 logger.error(f"[SCAN] Неверная корневая директория: {root_dir}")

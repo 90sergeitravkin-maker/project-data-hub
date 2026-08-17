@@ -21,7 +21,7 @@ from typing import List, Tuple
 
 from src.core.logger import logger
 from src.back.app_ecomru.config import (
-    DATA_FILE_TEMP,
+    DATA_FILE_TEST,
     DATA_FILE_RAW,
     DOWNLOAD_TIMEOUT,
     DOWNLOAD_RETRIES,
@@ -266,8 +266,8 @@ def download_and_move_atomically(data: dict) -> List[Path]:
 
     Использует requests.Session для переиспользования TCP-соединений.
     """
-    temp_root = Path(DATA_FILE_TEMP) if DATA_FILE_TEMP else Path(".")
-    raw_root = Path(DATA_FILE_RAW) if DATA_FILE_RAW else Path(".")
+    temp_root = Path(DATA_FILE_TEST) if DATA_FILE_TEST else Path(".")
+    raw_root  = Path(DATA_FILE_RAW)  if DATA_FILE_RAW  else Path(".")
     temp_target, raw_target, _ = build_paths(data, temp_root, raw_root)
     links = data.get("links", [])
 

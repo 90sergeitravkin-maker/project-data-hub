@@ -60,10 +60,9 @@ def get_split_columns(entity: str) -> List[str]:
     """
     Возвращает список столбцов для разбиения по entity (hot-reload).
 
-    Поддерживает форматы:
-      1. Список:           {"ENTITY": ["col1", "col2"]}
-      2. Объект:           {"ENTITY": {"processing": {"split_columns": ["col1", "col2"]}}}
-      3. Одиночный столбец: {"ENTITY": {"processing": {"split_column": "col1"}}}
+    Поддерживает два формата в _fields_config.json:
+      1. Простой список:  {"ENTITY": ["col1", "col2"]}
+      2. Объект:          {"ENTITY": {"processing": {"split_column": ["col1"]}}}
     """
     if not entity:
         return []
@@ -78,22 +77,16 @@ def get_split_columns(entity: str) -> List[str]:
     if isinstance(entity_cfg, list):
         return [c for c in entity_cfg if isinstance(c, str) and c]
 
-    # Формат 2: объект с processing
+    # Формат 2: объект с processing.split_column
     if isinstance(entity_cfg, dict):
         processing = entity_cfg.get("processing", {})
         if isinstance(processing, dict):
-            # Вариант: split_columns (список)
-            cols = processing.get("split_columns")
+            cols = processing.get("split_columns", [])
             if isinstance(cols, list):
                 return [c for c in cols if isinstance(c, str) and c]
             if isinstance(cols, str) and cols:
                 return [cols]
-            # Вариант: split_column (одиночный)
-            col = processing.get("split_column")
-            if isinstance(col, str) and col:
-                return [col]
-            if isinstance(col, list):
-                return [c for c in col if isinstance(c, str) and c]
+
     return []
 
 
@@ -113,21 +106,24 @@ PORT = int(os.getenv("ECOMRU_PORT", 8001))
 RELOAD = os.getenv("APP_ECOMRU_RELOAD", "true").lower() in ("true", "1", "yes")
 
 # KAFKA
-APP_KAFKA_URL = os.getenv("APP_KAFKA_URL", "http://127.0.0.1:8081/api/v1/app_kafka")
+APP_KAFKA_URL   = os.getenv("APP_KAFKA_URL", "http://127.0.0.1:8081/api/v1/app_kafka")
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
 
-KAFKA_DOWNLOAD_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_DOWNLOAD", "ecomru-download")
+KAFKA_DOWNLOAD_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_DOWNLOAD",    "ecomru-download"      )
 KAFKA_DOWNLOAD_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_DOWNLOAD", "ecomru-download-group")
 
-KAFKA_VERIFICATION_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_VERIFICATION", "ecomru-verification")
+KAFKA_VERIFICATION_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_VERIFICATION",    "ecomru-verification"      )
 KAFKA_VERIFICATION_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_VERIFICATION", "ecomru-verification-group")
 
-KAFKA_TRANSFER_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_TRANSFER", "ecomru-transfer")
+KAFKA_TRANSFER_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_TRANSFER",    "ecomru-transfer"      )
 KAFKA_TRANSFER_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_TRANSFER", "ecomru-transfer-group")
 
-DATA_FILE_EXT = Path(os.getenv("APP_FAIL_MANAGER_EXT", ""))
-DATA_FILE_RAW = Path(os.getenv("APP_FAIL_MANAGER_RAW", ""))
-DATA_FILE_TEMP = Path(os.getenv("APP_FAIL_MANAGER_TEMP", ""))
+KAFKA_REPORT_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_REPORT",    "ecomru-report"      )
+KAFKA_REPORT_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_REPORT", "ecomru-report-group")
+
+DATA_FILE_RAW  = Path(os.getenv("APP_FAIL_MANAGER_RAW",  ""))
+DATA_FILE_TEST = Path(os.getenv("APP_FAIL_MANAGER_TEST", ""))
+DATA_FILE_EXT  = Path(os.getenv("APP_FAIL_MANAGER_EXT",  ""))
 MAX_FILE_SIZE = 120 * 1024 * 1024
 
 # === Строгая изоляция БД ===
@@ -139,9 +135,9 @@ ECOMRU_CHUNK_SIZE = 262144
 ECOMRU_DOWNLOAD_WORKERS = 8
 ECOMRU_RATE_PER_SECOND = 0
 
-MAX_CONCURRENT = int(os.getenv("ECOMRU_MAX_CONCURRENT", "5"))
+MAX_CONCURRENT   = int(os.getenv("ECOMRU_MAX_CONCURRENT",     "5"))
 DOWNLOAD_TIMEOUT = int(os.getenv("ECOMRU_DOWNLOAD_TIMEOUT", "300"))
-DOWNLOAD_RETRIES = int(os.getenv("ECOMRU_DOWNLOAD_RETRIES", "3"))
+DOWNLOAD_RETRIES = int(os.getenv("ECOMRU_DOWNLOAD_RETRIES",   "3"))
 
 EXTERNAL_API_URL = os.getenv("EXTERNAL_API_URL", "")
 EXTERNAL_API_KEY = os.getenv("EXTERNAL_API_KEY", "")
@@ -153,8 +149,7 @@ openapi_tags = {
 }
 
 DISK_SPACE_SAFETY_FACTOR = 2 * 1024 * 1024 * 1024  # 2 ГБ в байтах
-KAFKA_REPORT_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_REPORT", "ecomru-report")
-KAFKA_REPORT_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_REPORT", "ecomru-report-group")
+
 
 
 def ensure_storage_ready() -> Path:
