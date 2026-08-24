@@ -102,11 +102,11 @@ API_PREFIX_V1 = f"/api/v1/{APP_NAME}"
 # Логирование и сеть
 LOG_LEVEL = os.getenv("ECOMRU_LOG_LEVEL", "DEBUG").upper()
 HOST = os.getenv("ECOMRU_HOST", "127.0.0.1")
-PORT = int(os.getenv("ECOMRU_PORT", 8001))
+PORT = int(os.getenv("ECOMRU_PORT", 8000))
 RELOAD = os.getenv("APP_ECOMRU_RELOAD", "true").lower() in ("true", "1", "yes")
 
 # KAFKA
-APP_KAFKA_URL   = os.getenv("APP_KAFKA_URL", "http://127.0.0.1:8081/api/v1/app_kafka")
+APP_KAFKA_URL   = os.getenv("APP_KAFKA_URL", "http://127.0.0.1:8000/api/v1/app_kafka")
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
 
 KAFKA_DOWNLOAD_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_DOWNLOAD",    "ecomru-download"      )

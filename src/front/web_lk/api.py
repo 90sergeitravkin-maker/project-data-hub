@@ -168,6 +168,6 @@ async def profile_page(request: Request, user_id: int = Depends(get_current_user
 @router.get("/test", response_class=HTMLResponse, tags=[TAG_NAME])
 async def test_page(request: Request):
     return templates.TemplateResponse(
-        name="web_lk/test.html",
+        name="web_lk/main.html",
         request=request
     )

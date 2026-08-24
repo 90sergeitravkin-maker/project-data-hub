@@ -29,7 +29,7 @@ HISTORY_RETENTION_DAYS = int(get_env("MONITOR_HISTORY_DAYS", "7"))
 TOP_N_HEAVY = int(get_env("MONITOR_TOP_N", "10"))
 
 DISK_PATHS = []
-for key in ["APP_FAIL_MANAGER_EXT", "APP_FAIL_MANAGER_RAW", "APP_FAIL_MANAGER_TEMP"]:
+for key in ["APP_FAIL_MANAGER_EXT", "APP_FAIL_MANAGER_RAW", "APP_FAIL_MANAGER_TEST"]:
     val = get_env(key, "")
     if val:
         DISK_PATHS.append(val)

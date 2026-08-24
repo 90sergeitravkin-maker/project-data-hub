@@ -1,5 +1,182 @@
 {
+  "API-COMTRADE-WORLD_TRADE-1": {
+    "processing": {
+      "split_columns": [
+        "dataset_checksum"
+      ]
+    },
+    "column": {
+      "hash_address": {
+        "type": "String",
+        "unique": true
+      },
+      "type_code": {
+        "type": "String"
+      },
+      "freq_code": {
+        "type": "String"
+      },
+      "period": {
+        "type": "String"
+      },
+      "reporter_code": {
+        "type": "Int64",
+        "checks": [
+          {
+            "reference_file": "API-COMTRADE-COUNTRY_REPORTER-1",
+            "reference_column": "id",
+            "is_null": false
+          }
+        ]
+      },
+      "flow_code": {
+        "type": "String"
+      },
+      "partner_code": {
+        "type": "Int64",
+        "checks": [
+          {
+            "reference_file": "API-COMTRADE-COUNTRY_AREAS-1",
+            "reference_column": "id",
+            "is_null": true
+          }
+        ]
+      },
+      "partner2_code": {
+        "type": "String"
+      },
+      "classification_code": {
+        "type": "String"
+      },
+      "cmd_code": {
+        "type": "String"
+      },
+      "customs_code": {
+        "type": "String"
+      },
+      "mos_code": {
+        "type": "String"
+      },
+      "mot_code": {
+        "type": "String"
+      },
+      "qty_unit_code": {
+        "type": "String"
+      },
+      "dataset_checksum": {
+        "type": "String"
+      },
+      "ref_period_id": {
+        "type": "Int64"
+      },
+      "ref_year": {
+        "type": "Int64"
+      },
+      "ref_month": {
+        "type": "Int64"
+      },
+      "reporter_iso": {
+        "type": "String"
+      },
+      "reporter_desc": {
+        "type": "String"
+      },
+      "flow_desc": {
+        "type": "String"
+      },
+      "partner_iso": {
+        "type": "String"
+      },
+      "partner_desc": {
+        "type": "String"
+      },
+      "partner2_iso": {
+        "type": "String"
+      },
+      "partner2_desc": {
+        "type": "String"
+      },
+      "classification_search_code": {
+        "type": "String"
+      },
+      "is_original_classification": {
+        "type": "Bool"
+      },
+      "cmd_desc": {
+        "type": "String"
+      },
+      "aggr_level": {
+        "type": "Int64"
+      },
+      "is_leaf": {
+        "type": "Bool"
+      },
+      "customs_desc": {
+        "type": "String"
+      },
+      "mot_desc": {
+        "type": "String"
+      },
+      "qty_unit_abbr": {
+        "type": "String"
+      },
+      "qty": {
+        "type": "Float64"
+      },
+      "is_qty_estimated": {
+        "type": "Bool"
+      },
+      "alt_qty_unit_code": {
+        "type": "String"
+      },
+      "alt_qty_unit_abbr": {
+        "type": "String"
+      },
+      "alt_qty": {
+        "type": "Float64"
+      },
+      "is_alt_qty_estimated": {
+        "type": "Bool"
+      },
+      "net_wgt": {
+        "type": "Float64"
+      },
+      "is_net_wgt_estimated": {
+        "type": "Bool"
+      },
+      "gross_wgt": {
+        "type": "Float64"
+      },
+      "is_gross_wgt_estimated": {
+        "type": "Bool"
+      },
+      "cifvalue": {
+        "type": "Float64"
+      },
+      "fobvalue": {
+        "type": "Float64"
+      },
+      "primary_value": {
+        "type": "Float64"
+      },
+      "legacy_estimation_flag": {
+        "type": "Int64"
+      },
+      "is_reported": {
+        "type": "Bool"
+      },
+      "is_aggregate": {
+        "type": "Bool"
+      }
+    }
+  },
   "WEB-CUSTOMS_CHN-WORLD_TRADE-1": {
+    "processing": {
+      "split_columns": [
+        "trading_partner_code",
+        "period"
+      ]
+    },
     "column": {
       "flow": {
         "type": "String",
@@ -64,212 +241,45 @@
     }
   },
   "WEB-ASEANSTAT-WORLD_TRADE-1": {
-    "processing": {},
-    "column": {
-      "1": 1
-    }
-  },
-  "API-COMTRADE-WORLD_TRADE-1": {
     "processing": {
       "split_columns": [
-        "dataset_checksum"
+        "reporter_code",
+        "period"
       ]
     },
     "column": {
-      "hash_address": {
-        "type": "String",
-        "is_true": true
-      },
-      "type_code": {
-        "type": "String",
-        "is_true": true
-      },
-      "freq_code": {
-        "type": "String",
-        "is_true": true
-      },
-      "period": {
-        "type": "String",
-        "is_true": false
+      "reporter": {
+        "type": "String"
       },
       "reporter_code": {
-        "type": "Int64",
-        "is_true": false
+        "type": "String"
       },
-      "flow_code": {
-        "type": "String",
-        "is_true": false
+      "year": {
+        "type": "String"
+      },
+      "period": {
+        "type": "String"
+      },
+      "flow": {
+        "type": "String"
+      },
+      "partner": {
+        "type": "String"
       },
       "partner_code": {
-        "type": "Int64",
-        "is_true": false
+        "type": "String"
       },
-      "partner2_code": {
-        "type": "Int64",
-        "is_true": false
+      "commodity": {
+        "type": "String"
       },
-      "classification_code": {
-        "type": "String",
-        "is_true": false
+      "commodity_code": {
+        "type": "String"
       },
-      "cmd_code": {
-        "type": "String",
-        "is_true": false
+      "trade_value": {
+        "type": "String"
       },
-      "ustoms_code": {
-        "type": "String",
-        "is_true": false
-      },
-      "mos_code": {
-        "type": "String",
-        "is_true": false
-      },
-      "mot_code": {
-        "type": "String",
-        "is_true": false
-      },
-      "qty_unit_code": {
-        "type": "String",
-        "is_true": false
-      },
-      "dataset_checksum": {
-        "type": "String",
-        "is_true": false
-      },
-      "ref_period_id": {
-        "type": "Int64",
-        "is_true": false
-      },
-      "ref_year": {
-        "type": "Int64",
-        "is_true": false
-      },
-      "ref_month": {
-        "type": "Int64",
-        "is_true": false
-      },
-      "reporter_iso": {
-        "type": "String",
-        "is_true": false
-      },
-      "reporter_desc": {
-        "type": "String",
-        "is_true": false
-      },
-      "flow_desc": {
-        "type": "String",
-        "is_true": false
-      },
-      "partner_iso": {
-        "type": "String",
-        "is_true": false
-      },
-      "partner_desc": {
-        "type": "String",
-        "is_true": false
-      },
-      "partner2_iso": {
-        "type": "String",
-        "is_true": false
-      },
-      "partner2_desc": {
-        "type": "String",
-        "is_true": false
-      },
-      "classification_search_code": {
-        "type": "String",
-        "is_true": false
-      },
-      "is_original_classification": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "cmd_desc": {
-        "type": "String",
-        "is_true": false
-      },
-      "aggr_level": {
-        "type": "Int64",
-        "is_true": false
-      },
-      "is_leaf": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "customs_desc": {
-        "type": "String",
-        "is_true": false
-      },
-      "mot_desc": {
-        "type": "String",
-        "is_true": false
-      },
-      "qty_unit_abbr": {
-        "type": "String",
-        "is_true": false
-      },
-      "qty": {
-        "type": "Float64",
-        "is_true": false
-      },
-      "is_qty_estimated": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "alt_qty_unit_code": {
-        "type": "String",
-        "is_true": false
-      },
-      "alt_qty_unit_abbr": {
-        "type": "String",
-        "is_true": false
-      },
-      "alt_qty": {
-        "type": "Float64",
-        "is_true": false
-      },
-      "is_alt_qty_estimated": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "net_wgt": {
-        "type": "Float64",
-        "is_true": false
-      },
-      "is_net_wgt_estimated": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "gross_wgt": {
-        "type": "Float64",
-        "is_true": false
-      },
-      "is_gross_wgt_estimated": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "cifvalue": {
-        "type": "Float64",
-        "is_true": false
-      },
-      "fobvalue": {
-        "type": "Float64",
-        "is_true": false
-      },
-      "primary_value": {
-        "type": "Float64",
-        "is_true": false
-      },
-      "legacy_estimation_flag": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "is_reported": {
-        "type": "Bool",
-        "is_true": false
-      },
-      "is_aggregate": {
-        "type": "Bool"
+      "hash_address": {
+        "type": "String"
       }
     },
     "WEB-CUSTOMS_CHN-WORLD_TRADE-1": [

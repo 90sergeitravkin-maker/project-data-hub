@@ -35,6 +35,7 @@ def _collect_app_openapi_tags() -> List[Dict[str, str]]:
         ("app_text_dup_check", "src.back.app_text_dup_check.config"),
         ("app_link",           "src.back.app_link.config"),
         ("app_kafka",          "src.back.app_kafka.config"),
+        ("app_data_validator", "src.back.app_data_validator.config"),
         # === Frontend ===
         ("web_monitor",        "src.front.web_monitor.config"),
         ("web_lk",             "src.front.web_lk.config"),
@@ -121,7 +122,7 @@ async def root():
             {"name": "src.back.app_text_dup_check", "prefix": "/api/v1/app_text_dup_check"},
             {"name": "src.back.app_link",           "prefix": "/api/v1/app_link"},
             {"name": "src.back.app_kafka",          "prefix": "/api/v1/app_kafka"},
-
+            {"name": "src.back.app_data_validator", "prefix": "/api/v1/app_data_validator"},
             # === Frontend ===
             {"name": "src.front.web_lk",            "prefix": "/api/v1/web_lk"},
             {"name": "src.front.web_file_manager",  "prefix": "/api/v1/web_file_manager"},
@@ -150,6 +151,7 @@ def include_app_routers(app) -> None:
         ("app_users",          "src.back.app_users.api",          "src.back.app_users.config"),
         ("app_link",           "src.back.app_link.api",           "src.back.app_link.config"),
         ("app_kafka",          "src.back.app_kafka.api",          "src.back.app_kafka.config"),
+        ("app_data_validator", "src.back.app_data_validator.api", "src.back.app_data_validator.config"),
         # === Frontend ===
         ("web_monitor",        "src.front.web_monitor.api",       "src.front.web_monitor.config"),
         ("web_lk",             "src.front.web_lk.api",            "src.front.web_lk.config"),

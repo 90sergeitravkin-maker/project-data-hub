@@ -2,16 +2,22 @@
 """
 Веб-интерфейс управления файлами: просмотр папок с пагинацией.
 Поддержка переключения между корнями: EXT / RAW / TEMP.
+Включает прокси-роутеры для скачивания файлов через backend app_file_manager.
 """
 from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, status, Query
 from fastapi.responses import HTMLResponse
 
-# === ВАЖНО: API_PREFIX_V1 берём из FRONTEND конфига, а не backend! ===
 from src.core.logger import logger
 from src.front.web_file_manager.config import API_PREFIX_V1, templates, TAG_NAME
 from src.back.app_file_manager.config import AVAILABLE_ROOTS
 from src.back.app_file_manager.services import AppDataChecker
+
+# === ИМПОРТЫ БЭКЕНД-ЭНДПОИНТОВ ДЛЯ ПРОКСИРОВАНИЯ ===
+from src.back.app_file_manager.api import (
+    download_file as _backend_download_file,
+    download_as_csv as _backend_download_csv,
+)
 
 router = APIRouter(tags=[TAG_NAME])
 
@@ -42,6 +48,47 @@ def _parent_path(folder_path: str) -> str:
     return "/".join(parts[:-1])
 
 
+# =====================================================================
+# ПРОКСИ-РОУТЕРЫ: делегируют запросы на backend app_file_manager
+# =====================================================================
+@router.get(
+    "/download-file",
+    summary="Скачать файл по пути (прокси на backend)",
+    tags=[TAG_NAME],
+)
+async def download_file(
+        file_path: str = Query(..., description="Путь к файлу"),
+        root: str = Query("ext", description="Корень: ext|raw|temp"),
+        as_attachment: bool = Query(True, description="Скачать как вложение"),
+):
+    """
+    Проксирует запрос на backend app_file_manager.
+    Позволяет шаблону использовать единый префикс /api/v1/web_file_manager/.
+    """
+    logger.debug(f"[WEB_FILE_MANAGER] Прокси download-file: {file_path} (root={root})")
+    return await _backend_download_file(file_path=file_path, root=root, as_attachment=as_attachment)
+
+
+@router.get(
+    "/download-csv",
+    summary="Скачать файл в формате CSV (прокси на backend)",
+    tags=[TAG_NAME],
+)
+async def download_csv(
+        file_path: str = Query(..., description="Путь к файлу"),
+        root: str = Query("ext", description="Корень: ext|raw|temp"),
+):
+    """
+    Проксирует запрос на backend app_file_manager.
+    Конвертирует Parquet/JSON/CSV в CSV и отдаёт клиенту.
+    """
+    logger.debug(f"[WEB_FILE_MANAGER] Прокси download-csv: {file_path} (root={root})")
+    return await _backend_download_csv(file_path=file_path, root=root)
+
+
+# =====================================================================
+# СТРАНИЦЫ ИНТЕРФЕЙСА
+# =====================================================================
 @router.get(
     "/test",
     response_class=HTMLResponse,
@@ -61,7 +108,7 @@ async def page_view(
     if root is None:
         logger.info("[WEB_FILE_MANAGER/TEST] Запрос: выбор корня")
         return templates.TemplateResponse(
-            name="web_file_manager/test.html",
+            name="web_file_manager/main.html",
             request=request,
             context={
                 "mode": "select_root",
@@ -74,16 +121,16 @@ async def page_view(
     root_key, root_info = _resolve_root(root)
     root_dir = root_info["path"]
     normalized_path = _normalize_path(folder_path)
-
     display_path = normalized_path if normalized_path else "/"
+
     # Полный путь на диске
     full_path = root_dir / normalized_path if normalized_path else root_dir
-
     logger.info(
         f"[WEB_FILE_MANAGER/TEST] root={root_key}, path={display_path}, "
         f"full_path={full_path}, search={search!r}, pattern={pattern!r}, "
         f"page={page}, page_size={page_size}"
     )
+
     try:
         # === РЕЖИМ ПОИСКА ===
         if search and search.strip():
@@ -94,7 +141,6 @@ async def page_view(
                 page=page,
                 page_size=page_size,
             )
-
             if not success:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -127,7 +173,7 @@ async def page_view(
             }
 
             return templates.TemplateResponse(
-                name="web_file_manager/test.html",
+                name="web_file_manager/main.html",
                 request=request,
                 context={
                     "mode": "search",
@@ -157,7 +203,6 @@ async def page_view(
                 page=page,
                 page_size=page_size,
             )
-
             if not success:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -197,7 +242,7 @@ async def page_view(
             }
 
             return templates.TemplateResponse(
-                name="web_file_manager/test.html",
+                name="web_file_manager/main.html",
                 request=request,
                 context={
                     "mode": "browse",
@@ -247,9 +292,7 @@ async def preview_file_page(
 ) -> HTMLResponse:
     root_key, root_info = _resolve_root(root)
     root_dir = root_info["path"]
-
     normalized_file_path = _normalize_path(file_path)
-
     column_filters = {
         k: v for k, v in request.query_params.items()
         if k not in ("file_path", "page", "page_size", "root") and v
@@ -315,6 +358,7 @@ async def preview_file_page(
                 "api_prefix": API_PREFIX_V1,  # ← /api/v1/web_file_manager
             },
         )
+
     except HTTPException:
         raise
     except Exception as e:
