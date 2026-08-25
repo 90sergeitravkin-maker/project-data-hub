@@ -110,7 +110,7 @@ if static_path.exists():
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False, tags=["System"])
 async def root_redirect():
-    return RedirectResponse(url="/docs", status_code=302)
+    return RedirectResponse(url="/api/v1/web_lk/login", status_code=302)
 
 
 if __name__ == "__main__":
