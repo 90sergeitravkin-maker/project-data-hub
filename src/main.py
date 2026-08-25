@@ -61,13 +61,6 @@ config_logging(level=SERVICE_LOG_LEVEL, log_file=LOG_FILE)
 async def lifespan(app: FastAPI):
     logger.info("🚀 Запуск Data Validation Service (без Kafka)")
 
-    # === Инициализация хранилища (если нужно, раскомментируйте) ===
-    # try:
-    #     storage_path = ensure_storage_ready()
-    #     logger.info(f"[STORAGE] Директория: {storage_path}")
-    # except Exception as e:
-    #     logger.warning(f"[STORAGE] Пропуск инициализации: {e}")
-
     logger.info("✅ Приложение успешно запущено и готово принимать запросы!")
 
     yield  # ── Работа приложения ──
