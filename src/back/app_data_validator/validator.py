@@ -437,10 +437,10 @@ class DataValidator:
 
     def _validate_directory(self, dir_path: Path, source_name: str, column_rules: Dict, start_time: float) -> Dict[
         str, Any]:
-        logger.info(f"[Validator] Валидация директории: {dir_path}")
-
+        logger.info(f"[Validator] Валидация директории (рекурсивно): {dir_path}")
         supported_exts = {'.csv', '.parquet', '.xlsx', '.xls'}
-        # Используем rglob для рекурсивного поиска файлов во всех подпапках
+
+        # ИСПРАВЛЕНИЕ: rglob вместо iterdir для обхода всех вложенных папок
         files_to_process = [
             f for f in dir_path.rglob('*')
             if f.is_file() and f.suffix.lower() in supported_exts
