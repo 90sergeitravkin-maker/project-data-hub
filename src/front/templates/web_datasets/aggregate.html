@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Агрегация датасетов{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-bar-chart me-2"></i>Агрегация датасетов
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Search form -->
+            <form method="GET" class="mb-3">
+                <div class="row g-2">
+                    <div class="col-md-8">
+                        <input type="text" class="form-control" name="name"
+                               value="{{ name_filter }}" placeholder="Имя датасета для фильтрации" required>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> Агрегировать
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            {% if results %}
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Имя</th>
+                            <th>Период</th>
+                            <th class="text-end">Размер (bytes)</th>
+                            <th class="text-end">Количество строк</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in results %}
+                        <tr>
+                            <td><strong>{{ row.name }}</strong></td>
+                            <td>{{ row.period or '—' }}</td>
+                            <td class="text-end">{{ "{:,}".format(row.size) if row.size else '—' }}</td>
+                            <td class="text-end">{{ "{:,}".format(row.rows) if row.rows else '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% elif name_filter %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-circle me-2"></i>Нет результатов для "{{ name_filter }}"
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

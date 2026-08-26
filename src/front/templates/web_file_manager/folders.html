@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Хлебные крошки -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{{ API_PREFIX_V1 }}/folders">📁 Корень</a>
+            </li>
+            {% for part in path_parts %}
+                {% set loop_path = path_parts[:loop.index] | join('/') %}
+                {% if loop.last %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ part }}</li>
+                {% else %}
+                    <li class="breadcrumb-item">
+                        <a href="{{ API_PREFIX_V1 }}/folders?path={{ loop_path }}">{{ part }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </nav>
+
+    <!-- Статистика -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="text-warning">{{ folders|length }}</h5>
+                    <small class="text-muted">Папок</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="text-info">{{ files|length }}</h5>
+                    <small class="text-muted">Файлов</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="text-success">{{ total }}</h5>
+                    <small class="text-muted">Всего</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body text-center">
+                    <h5>{{ page }}/{{ (total + page_size - 1) // page_size }}</h5>
+                    <small class="text-muted">Страница</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Список папок -->
+    {% if folders %}
+        <div class="row g-3">
+            {% for folder in folders %}
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card bg-dark border-secondary h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="bi bi-folder2 text-warning fs-4"></i>
+                            <h6 class="card-title mb-0 text-truncate" title="{{ folder }}">
+                                {{ folder }}
+                            </h6>
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
+                            <a href="{{ API_PREFIX_V1 }}/folders?path={{ current_path }}/{{ folder }}{% if applied_pattern %}&pattern={{ applied_pattern }}{% endif %}"
+                               class="btn btn-sm btn-outline-primary flex-grow-1">
+                                <i class="bi bi-eye"></i> Открыть
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle me-2"></i>
+            {% if current_path %}
+                Папка пуста или не содержит подпапок
+            {% else %}
+                В корневой директории нет папок
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- Пагинация -->
+    {% if has_prev or has_next %}
+    <nav class="mt-4" aria-label="Пагинация">
+        <ul class="pagination justify-content-center">
+            {% if has_prev %}
+            <li class="page-item">
+                <a class="page-link bg-dark border-secondary text-white"
+                   href="{{ API_PREFIX_V1 }}/folders?path={{ current_path }}{% if applied_pattern %}&pattern={{ applied_pattern }}{% endif %}&page={{ page - 1 }}">
+                    ← Назад
+                </a>
+            </li>
+            {% endif %}
+            {% if has_next %}
+            <li class="page-item">
+                <a class="page-link bg-dark border-secondary text-white"
+                   href="{{ API_PREFIX_V1 }}/folders?path={{ current_path }}{% if applied_pattern %}&pattern={{ applied_pattern }}{% endif %}&page={{ page + 1 }}">
+                    Вперёд →
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<style>
+.hover-card:hover {
+    border-color: #ffc107 !important;
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+}
+.breadcrumb {
+    background: #161b22;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+}
+</style>
+{% endblock %}

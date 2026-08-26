@@ -1,0 +1,32 @@
+{% if pagination and pagination.total_pages > 1 %}
+<nav aria-label="Навигация по страницам" class="mt-4">
+    <ul class="pagination justify-content-center flex-wrap">
+        <li class="page-item {% if pagination.current_page == 1 %}disabled{% endif %}">
+            <a class="page-link" href="?{{ pagination.query_params }}&page={{ pagination.current_page - 1 }}" aria-label="Предыдущая" {% if pagination.current_page == 1 %}tabindex="-1" aria-disabled="true"{% endif %}>
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% if pagination.current_page > 3 %}
+        <li class="page-item"><a class="page-link" href="?{{ pagination.query_params }}&page=1">1</a></li>
+        {% if pagination.current_page > 4 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+        {% endif %}
+        {% for page in pagination.page_range %}
+        <li class="page-item {% if page == pagination.current_page %}active{% endif %}" {% if page == pagination.current_page %}aria-current="page"{% endif %}>
+            <a class="page-link" href="?{{ pagination.query_params }}&page={{ page }}">{{ page }}</a>
+        </li>
+        {% endfor %}
+        {% if pagination.current_page < pagination.total_pages - 2 %}
+        {% if pagination.current_page < pagination.total_pages - 3 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+        <li class="page-item"><a class="page-link" href="?{{ pagination.query_params }}&page={{ pagination.total_pages }}">{{ pagination.total_pages }}</a></li>
+        {% endif %}
+        <li class="page-item {% if pagination.current_page == pagination.total_pages %}disabled{% endif %}">
+            <a class="page-link" href="?{{ pagination.query_params }}&page={{ pagination.current_page + 1 }}" aria-label="Следующая" {% if pagination.current_page == pagination.total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+    <div class="text-center text-secondary small mt-1">
+        Страница {{ pagination.current_page }} из {{ pagination.total_pages }}
+    </div>
+</nav>
+{% endif %}

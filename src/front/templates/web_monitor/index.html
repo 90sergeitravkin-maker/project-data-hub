@@ -1,0 +1,422 @@
+<!-- src/front/templates/web_monitor/index.html -->
+{% extends "base.html" %}
+
+{% block title %}Мониторинг ресурсов — Data Hub{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static('css/web_monitor.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>
+            📊 Мониторинг ресурсов
+            <span id="statusDot" class="status-dot status-load" title="Загрузка..."></span>
+        </h3>
+        <div>
+            <span id="lastUpdate" class="text-muted">Обновление...</span>
+            <button class="btn btn-primary btn-sm ms-2" onclick="refreshAll()" title="Обновить">
+                🔄
+            </button>
+        </div>
+    </div>
+
+    <div class="monitor-controls mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label>Интервал обновления (сек)</label>
+                <select id="refreshInterval" class="form-select form-select-sm">
+                    <option value="0">Выкл</option>
+                    <option value="10">10</option>
+                    <option value="30" selected>30</option>
+                    <option value="60">60</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Глубина истории (мин)</label>
+                <select id="historyMinutes" class="form-select form-select-sm">
+                    <option value="15">15</option>
+                    <option value="30">30</option>
+                    <option value="60" selected>60</option>
+                    <option value="120">120</option>
+                    <option value="360">6 часов</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Топ тяжёлых запросов</label>
+                <select id="topN" class="form-select form-select-sm">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary w-100 btn-sm" onclick="refreshAll()">
+                    🔍 Применить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4" id="processMetrics">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">RSS (резидентная)</div>
+                <div class="metric-value" id="rssMb">—</div>
+                <div class="metric-sub" id="rssPercent">— % от общей RAM</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">VMS (виртуальная)</div>
+                <div class="metric-value" id="vmsMb">—</div>
+                <div class="metric-sub" id="vmsInfo">виртуальная память</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">CPU</div>
+                <div class="metric-value" id="cpuPercent">—</div>
+                <div class="metric-sub" id="threadsInfo">— потоков</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-label">Uptime</div>
+                <div class="metric-value" id="uptime">—</div>
+                <div class="metric-sub" id="trackedInfo">отслежено: — MB</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="section-header mb-0">📦 Потребление по приложениям</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="appsTableContainer">
+                        <div class="loading-spinner"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="section-header mb-0">🏋️ Тяжёлые запросы (по приросту RAM)</h5>
+                </div>
+                <div class="card-body" id="heavyRequestsContainer">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="section-header mb-0">🚨 Алерты</h5>
+                </div>
+                <div class="card-body" id="alertsContainer" style="max-height: 600px; overflow-y: auto;">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- Новая карточка: дисковое пространство -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="section-header mb-0">💾 Использование дисков</h5>
+                </div>
+                <div class="card-body" id="diskUsageContainer">
+                    <div class="loading-spinner" id="diskLoading"></div>
+                    <div id="diskContent" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const API_BASE = '/api/v1/web_monitor/api';
+let refreshTimer = null;
+
+function formatMb(val) {
+    if (val === undefined || val === null) return '—';
+    if (val >= 1024) return (val / 1024).toFixed(2) + ' GB';
+    return val.toFixed(1) + ' MB';
+}
+
+function formatUptime(sec) {
+    if (!sec) return '—';
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    if (h > 0) return `${h}ч ${m}м`;
+    if (m > 0) return `${m}м ${s}с`;
+    return `${s}с`;
+}
+
+function formatTime(isoStr) {
+    if (!isoStr) return '—';
+    try {
+        const d = new Date(isoStr);
+        return d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+    } catch(e) {
+        return isoStr;
+    }
+}
+
+function ramBarClass(pct) {
+    if (pct >= 80) return 'ram-crit';
+    if (pct >= 60) return 'ram-high';
+    if (pct >= 30) return 'ram-medium';
+    return 'ram-low';
+}
+
+function setStatus(status) {
+    const dot = document.getElementById('statusDot');
+    dot.className = 'status-dot status-' + status;
+    dot.title = status === 'ok' ? 'Данные актуальны' :
+                status === 'err' ? 'Ошибка получения данных' : 'Загрузка...';
+}
+
+async function fetchJson(endpoint, params = {}) {
+    const url = new URL(API_BASE + '/' + endpoint, window.location.origin);
+    Object.entries(params).forEach(([k, v]) => { if (v !== null && v !== undefined) url.searchParams.set(k, v); });
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+}
+
+async function loadReport() {
+    try {
+        const data = await fetchJson('report');
+        if (data.error) throw new Error(data.error);
+
+        const p = data.process || {};
+        document.getElementById('rssMb').textContent = formatMb(p.rss_mb);
+        document.getElementById('rssPercent').textContent = (p.percent || 0).toFixed(1) + ' % от общей RAM';
+        document.getElementById('vmsMb').textContent = formatMb(p.vms_mb);
+        document.getElementById('cpuPercent').textContent = (p.cpu_percent || 0).toFixed(1) + ' %';
+        document.getElementById('threadsInfo').textContent = (p.threads || 0) + ' потоков';
+        document.getElementById('uptime').textContent = formatUptime(p.uptime_sec);
+        document.getElementById('trackedInfo').textContent =
+            'отслежено: ' + formatMb(data.total_tracked_mb);
+
+        renderAppsTable(data.apps || []);
+        setStatus('ok');
+        document.getElementById('lastUpdate').textContent =
+            'Обновлено: ' + new Date().toLocaleTimeString('ru-RU');
+    } catch (e) {
+        console.error('Report error:', e);
+        setStatus('err');
+        document.getElementById('appsTableContainer').innerHTML =
+            '<div class="empty-state">⚠️ Ошибка загрузки: ' + e.message + '</div>';
+    }
+}
+
+async function loadHeavyRequests() {
+    const minutes = document.getElementById('historyMinutes').value;
+    const topN = document.getElementById('topN').value;
+    try {
+        const data = await fetchJson('heavy-requests', {minutes, top_n: topN});
+        renderHeavyRequests(data);
+    } catch (e) {
+        console.error('Heavy requests error:', e);
+        document.getElementById('heavyRequestsContainer').innerHTML =
+            '<div class="empty-state">⚠️ ' + e.message + '</div>';
+    }
+}
+
+async function loadAlerts() {
+    try {
+        const data = await fetchJson('alerts', {limit: 50});
+        renderAlerts(data);
+    } catch (e) {
+        console.error('Alerts error:', e);
+        document.getElementById('alertsContainer').innerHTML =
+            '<div class="empty-state">⚠️ ' + e.message + '</div>';
+    }
+}
+
+// === Новая функция: загрузка дискового пространства ===
+async function loadDiskUsage() {
+    const container = document.getElementById('diskContent');
+    const loading = document.getElementById('diskLoading');
+    try {
+        const data = await fetchJson('disk-usage');
+        loading.style.display = 'none';
+        container.style.display = 'block';
+
+        if (data.paths && data.paths.length > 0) {
+            let html = '';
+            for (const item of data.paths) {
+                const percent = item.percent.toFixed(1);
+                const color = percent > 80 ? 'danger' : (percent > 60 ? 'warning' : 'success');
+                // Обрезаем длинные пути для читаемости
+                const shortPath = item.path.replace(/^[A-Za-z]:\\Users\\[^\\]+\\Desktop\\data\\/, '…/');
+                html += `
+                    <div class="disk-item mb-3">
+                        <div class="d-flex justify-content-between small">
+                            <span title="${item.path}">${shortPath}</span>
+                            <span>${percent}%</span>
+                        </div>
+                        <div class="progress" style="height: 16px;">
+                            <div class="progress-bar bg-${color}" role="progressbar"
+                                 style="width: ${percent}%;"
+                                 aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
+                            <span>свободно: ${item.free_gb} GB</span>
+                            <span>занято: ${item.used_gb} GB / ${item.total_gb} GB</span>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div class="empty-state">📭 Пути не заданы или недоступны</div>';
+        }
+    } catch (e) {
+        console.error('Disk usage error:', e);
+        loading.style.display = 'none';
+        container.style.display = 'block';
+        container.innerHTML = '<div class="empty-state">⚠️ Ошибка загрузки данных о дисках</div>';
+    }
+}
+
+function renderAppsTable(apps) {
+    const container = document.getElementById('appsTableContainer');
+    if (!apps || apps.length === 0) {
+        container.innerHTML = '<div class="empty-state">📭 Нет данных по приложениям</div>';
+        return;
+    }
+
+    apps.sort((a, b) => (b.peak_rss_mb || 0) - (a.peak_rss_mb || 0));
+
+    let html = `<table class="table apps-table table-sm mb-0">
+        <thead>
+            <tr>
+                <th>Приложение</th>
+                <th style="width: 200px;">RAM (текущая / пик)</th>
+                <th style="width: 120px;">Запросов</th>
+                <th style="width: 100px;">Δ/запрос</th>
+                <th style="width: 80px;">% от процесса</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+    for (const app of apps) {
+        const pct = app.percent_of_total || 0;
+        const barClass = ramBarClass(pct);
+        const name = app.app_name || 'unknown';
+        const shortName = name.replace(/^app_/, '').replace(/^web_/, '');
+
+        html += `<tr>
+            <td><b class="text-secondary-custom">${shortName}</b></td>
+            <td>
+                <div class="ram-bar">
+                    <div class="ram-bar-fill ${barClass}" style="width: ${Math.min(pct, 100)}%">
+                        ${formatMb(app.current_rss_mb)}
+                    </div>
+                </div>
+                <div class="metric-sub">пик: ${formatMb(app.peak_rss_mb)}</div>
+            </td>
+            <td>${app.requests_count || 0}</td>
+            <td>${(app.avg_delta_per_request_mb || 0).toFixed(2)} MB</td>
+            <td>${pct.toFixed(1)}%</td>
+        </tr>`;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function renderHeavyRequests(requests) {
+    const container = document.getElementById('heavyRequestsContainer');
+    if (!requests || requests.length === 0) {
+        container.innerHTML = '<div class="empty-state">✅ Нет тяжёлых запросов</div>';
+        return;
+    }
+
+    let html = '';
+    for (const r of requests) {
+        const shortApp = (r.app_name || '').replace(/^app_/, '').replace(/^web_/, '');
+        html += `<div class="heavy-req">
+            <div class="d-flex justify-content-between">
+                <span class="delta">+${(r.rss_delta_mb || 0).toFixed(1)} MB</span>
+                <span class="meta">${formatTime(r.captured_at)}</span>
+            </div>
+            <div class="path">${r.method || 'GET'} ${r.path || ''}</div>
+            <div class="meta">
+                <span class="text-secondary-custom">${shortApp}</span> ·
+                HTTP ${r.status_code || '?'} ·
+                ${r.duration_ms ? r.duration_ms.toFixed(0) + ' мс' : '?'} ·
+                пик: ${formatMb(r.peak_during_mb)}
+            </div>
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+
+function renderAlerts(alerts) {
+    const container = document.getElementById('alertsContainer');
+    if (!alerts || alerts.length === 0) {
+        container.innerHTML = '<div class="empty-state">✅ Алертов нет</div>';
+        return;
+    }
+
+    let html = '';
+    for (const a of alerts) {
+        const lvl = (a.level || '').toLowerCase();
+        const shortApp = (a.app_name || '').replace(/^app_/, '').replace(/^web_/, '');
+        const icon = lvl === 'critical' ? '🔴' : '🟡';
+        html += `<div class="alert-item level-${lvl}">
+            <div class="d-flex justify-content-between">
+                <span>${icon} <span class="alert-app">${shortApp}</span></span>
+                <span class="alert-time">${formatTime(a.fired_at)}</span>
+            </div>
+            <div class="alert-msg">
+                ${formatMb(a.rss_mb)} / порог ${formatMb(a.threshold_mb)}
+            </div>
+            ${a.message ? `<div class="meta">${a.message}</div>` : ''}
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+
+async function refreshAll() {
+    setStatus('load');
+    await Promise.all([loadReport(), loadHeavyRequests(), loadAlerts(), loadDiskUsage()]);
+}
+
+function setupAutoRefresh() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+    const interval = parseInt(document.getElementById('refreshInterval').value, 10);
+    if (interval > 0) {
+        refreshTimer = setInterval(refreshAll, interval * 1000);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    refreshAll();
+    setupAutoRefresh();
+
+    document.getElementById('refreshInterval').addEventListener('change', setupAutoRefresh);
+    document.getElementById('historyMinutes').addEventListener('change', () => {
+        loadHeavyRequests();
+        loadAlerts();
+    });
+    document.getElementById('topN').addEventListener('change', loadHeavyRequests);
+});
+</script>
+{% endblock %}

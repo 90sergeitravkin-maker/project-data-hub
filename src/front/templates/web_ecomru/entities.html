@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Сущности ECOMRU{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">📦 Сущности ECOMRU</h1>
+
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    {% if data %}
+        <p class="text-muted">Найдено сущностей: {{ data|length }}</p>
+
+        <div class="accordion" id="entitiesAccordion">
+            {% for entity in data %}
+                <div class="accordion-item mb-3 border border-warning rounded">
+                    <h2 class="accordion-header" id="heading{{ loop.index }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                            <strong>{{ entity.name }}</strong>
+                            <span class="badge bg-secondary ms-3">{{ entity.quantity|default(0) }} записей</span>
+                            <span class="badge bg-info ms-2 text-dark">Обновлено: {{ entity.maxDate|default('—') }}</span>
+                        </button>
+                    </h2>
+                    <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#entitiesAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <dl class="row">
+                                        <dt class="col-sm-4">Описание</dt>
+                                        <dd class="col-sm-8">{{ entity.description|default('—') }}</dd>
+
+                                        <dt class="col-sm-4">Количество</dt>
+                                        <dd class="col-sm-8">{{ entity.quantity|default(0) }}</dd>
+
+                                        <dt class="col-sm-4">Расписание</dt>
+                                        <dd class="col-sm-8"><code>{{ entity.schedule|default('—') }}</code></dd>
+
+                                        <dt class="col-sm-4">Ссылка</dt>
+                                        <dd class="col-sm-8">
+                                            {% if entity.entityLink %}
+                                                <a href="{{ entity.entityLink }}" target="_blank">{{ entity.entityLink }}</a>
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+
+                            <hr>
+
+                            <h5>📋 Список полей (колонок)</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Имя поля</th>
+                                            <th>Тип данных</th>
+                                            <th>Уникальное</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for col in entity.column %}
+                                            {% set field_name = col.keys()|first %}
+                                            {% set field_type = col[field_name] %}
+                                            <tr>
+                                                <td><code>{{ field_name }}</code></td>
+                                                <td><span class="badge bg-secondary">{{ field_type }}</span></td>
+                                                <td>
+                                                    {% if entity.uniqueTogether and field_name in entity.uniqueTogether %}
+                                                        <span class="badge bg-success">✅ Да</span>
+                                                    {% else %}
+                                                        <span class="text-muted">—</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">Нет данных для отображения.</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+# src/back/app_data_validator/services.py
+
+import json
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+from src.core.logger import logger
+from src.back.app_data_validator.validator import DataValidator
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _normalize_keys(obj):
+    """Рекурсивно убирает пробелы по краям всех ключей и строковых значений."""
+    if isinstance(obj, dict):
+        return {k.strip(): _normalize_keys(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_normalize_keys(item) for item in obj]
+    elif isinstance(obj, str):
+        return obj.strip()
+    return obj
+
+
+def _extract_source_from_path(file_path: str, config: dict) -> Optional[str]:
+    """
+    Извлекает имя источника из начала пути.
+    """
+    # Нормализуем путь
+    normalized_path = file_path.replace('\\', '/').strip('/')
+    parts = normalized_path.split('/')
+
+    if not parts:
+        return None
+
+    first_part = parts[0]
+
+    # Проверяем точное совпадение
+    if first_part in config:
+        return first_part
+
+    # Проверяем частичное совпадение (регистронезависимо)
+    first_part_lower = first_part.lower()
+    for source in config.keys():
+        if source.lower() == first_part_lower:
+            return source
+
+    # Если не нашли по первой части, пробуем найти любой ключ,
+    # который содержится в пути
+    for source in config.keys():
+        if source in normalized_path:
+            return source
+
+    return None
+
+
+class ValidationService:
+    @staticmethod
+    def validate_file(file_path: str) -> Dict[str, Any]:
+        """
+        Валидация файла или директории.
+
+        Args:
+            file_path: Путь к файлу или директории
+        """
+        config_path = PROJECT_ROOT / "files" / "_fields_config.json"
+
+        if not config_path.exists():
+            return {"error": f"Конфигурация не найдена: {config_path}"}
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                raw_config = json.load(f)
+        except Exception as e:
+            logger.error(f"[ValidationService] Ошибка чтения конфигурации: {e}")
+            return {"error": f"Ошибка чтения конфигурации: {e}"}
+
+        config = _normalize_keys(raw_config)
+
+        # Извлекаем source_name из пути
+        source_name = _extract_source_from_path(file_path, config)
+        if source_name is None:
+            return {
+                "error": f"Не удалось определить источник из пути: {file_path}",
+                "available_sources": list(config.keys()),
+                "hint": "Убедитесь, что путь начинается с имени источника из конфигурации"
+            }
+
+        logger.info(f"[ValidationService] Автоматически определён источник: {source_name} из пути {file_path}")
+
+        # Проверяем существование источника в конфигурации
+        if source_name not in config:
+            available = ", ".join(sorted(config.keys()))
+            return {
+                "error": f"Источник '{source_name}' не найден в конфигурации",
+                "available_sources": list(config.keys()),
+                "hint": f"Доступные источники: {available}"
+            }
+
+        source_config = config[source_name]
+
+        # Извлекаем секцию 'column'
+        if isinstance(source_config, dict) and 'column' in source_config:
+            column_rules = source_config['column']
+        elif isinstance(source_config, dict):
+            column_rules = source_config
+        else:
+            return {
+                "error": f"Источник '{source_name}' не содержит правил валидации",
+                "hint": "Проверьте структуру конфигурации. Ожидается секция 'column' или правила непосредственно в источнике"
+            }
+
+        # Преобразуем is_true -> required
+        for col_name, col_rules in column_rules.items():
+            if isinstance(col_rules, dict) and 'is_true' in col_rules and 'required' not in col_rules:
+                col_rules['required'] = bool(col_rules.pop('is_true'))
+
+        validator_config = {source_name: column_rules}
+
+        try:
+            validator = DataValidator(validator_config, max_error_examples=1000, max_duplicate_examples=10)
+            return validator.validate_file(file_path, source_name)
+        except Exception as e:
+            logger.error(f"[ValidationService] Ошибка валидации: {e}", exc_info=True)
+            return {"error": f"Ошибка валидации: {e}"}

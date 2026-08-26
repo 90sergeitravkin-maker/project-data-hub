@@ -1,0 +1,131 @@
+<!-- src/front/templates/web_logs/view.html -->
+{% extends "base.html" %}
+
+{% block title %}Логи приложения — Data Hub{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static('css/web_logs.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Заголовок -->
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">📋 Просмотр логов приложения</h4>
+            <div>
+                <span class="auto-refresh-indicator {% if auto and auto > 0 %}active{% endif %}"
+                      id="refreshIndicator"
+                      title="{% if auto and auto > 0 %}Автообновление каждые {{ auto }} сек{% else %}Автообновление выключено{% endif %}">
+                </span>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/api/v1/web_logs/view" class="filter-form">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label">Строк</label>
+                        <select name="lines" class="form-select">
+                            {% for n in [50, 100, 200, 500, 1000, 2000, 5000] %}
+                            <option value="{{ n }}" {% if lines == n %}selected{% endif %}>{{ n }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Уровень</label>
+                        <select name="level" class="form-select">
+                            <option value="">— все —</option>
+                            {% for lvl in levels %}
+                            <option value="{{ lvl }}" {% if level == lvl %}selected{% endif %}>{{ lvl }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Поиск в сообщении</label>
+                        <input type="text" name="search" class="form-control"
+                               value="{{ search }}" placeholder="Введите текст для поиска...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Авто-обновление (сек)</label>
+                        <select name="auto" class="form-select" id="autoSelect">
+                            <option value="0" {% if auto == 0 %}selected{% endif %}>Выкл</option>
+                            <option value="5"  {% if auto == 5 %}selected{% endif %}>5 сек</option>
+                            <option value="10" {% if auto == 10 %}selected{% endif %}>10 сек</option>
+                            <option value="30" {% if auto == 30 %}selected{% endif %}>30 сек</option>
+                            <option value="60" {% if auto == 60 %}selected{% endif %}>60 сек</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">🔍 Применить</button>
+                        <a href="/api/v1/web_logs/view" class="btn btn-secondary" title="Сбросить">✖</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="stats-bar mb-3 d-flex flex-wrap">
+        <span><span class="label">Файл:</span> {{ file }}</span>
+        <span><span class="label">Размер:</span> {{ file_size_kb }} KB</span>
+        <span><span class="label">Показано:</span> <b>{{ total }}</b> строк</span>
+        {% if level %}
+        <span><span class="label">Фильтр:</span>
+            <span class="badge badge-lvl-{{ level|lower|replace('warning','warn')|replace('critical','crit') }}">
+                {{ level }}
+            </span>
+        </span>
+        {% endif %}
+        {% if search %}
+        <span><span class="label">Поиск:</span> <b>"{{ search }}"</b></span>
+        {% endif %}
+    </div>
+
+    <!-- Таблица логов -->
+    <div class="log-container">
+        <table class="table log-table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th class="col-time">Время</th>
+                    <th class="col-level">Уровень</th>
+                    <th class="col-line">Стр</th>
+                    <th class="col-file">Файл</th>
+                    <th class="col-func">Функция</th>
+                    <th class="col-msg">Сообщение</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                {# === КЛАСС УРОВНЯ НА ВСЮ СТРОКУ === #}
+                <tr class="log-row {{ log.cls }}">
+                    <td class="col-time">{{ log.time }}</td>
+                    <td class="col-level"><b>{{ log.level }}</b></td>
+                    <td class="col-line">{{ log.line }}</td>
+                    <td class="col-file">{{ log.file }}</td>
+                    <td class="col-func">{{ log.func }}</td>
+                    <td class="col-msg">{{ log.msg }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center empty-state">
+                        📭 Нет записей, удовлетворяющих фильтрам
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const autoSec = parseInt(document.getElementById('autoSelect').value, 10) || 0;
+    if (autoSec > 0) {
+        setTimeout(() => { window.location.reload(); }, autoSec * 1000);
+    }
+})();
+</script>
+{% endblock %}

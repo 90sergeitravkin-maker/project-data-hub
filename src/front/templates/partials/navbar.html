@@ -1,0 +1,43 @@
+<nav class="navbar navbar-expand-lg navbar-dark mb-4" style="background-color: #1a1a1a;">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">
+            <span style="color: #ffd700; font-weight: bold;">⚡ Data Hub</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                {% block nav_items %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/api/v1/web_lk/profile">Профиль</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/api/v1/web_file_manager/test">Файлы</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/api/v1/web_datasets/aggregate">Датасеты</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/api/v1/web_monitor/">Мониторинг</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/api/v1/web_logs/view">Логи</a>
+                </li>
+                {% include 'web_ecomru/_nav.html'       ignore missing %}
+                {% include 'web_architecture/_nav.html' ignore missing %}
+                {% include 'web_other/_nav.html'        ignore missing %}
+                {% endblock %}
+            </ul>
+            <ul class="navbar-nav">
+                {% block nav_right %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/docs" target="_blank">
+                        <span style="color: #ffd700;">📚 API Docs</span>
+                    </a>
+                </li>
+                {% endblock %}
+            </ul>
+        </div>
+    </div>
+</nav>

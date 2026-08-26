@@ -1,0 +1,760 @@
+
+# src/back/app_data_validator/validator.py
+"""
+DataValidator — проверка CSV/Parquet/XLSX/XLS с использованием DuckDB для массовой обработки.
+Автоматически ищет последнюю доступную версию справочника по дате в имени папки.
+"""
+import csv
+import re
+import time
+import duckdb
+from datetime import datetime, date
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from src.core.logger import logger
+from src.back.app_data_validator.config import BASE_DATA_DIR
+
+try:
+    import pyarrow.parquet as pq
+except ImportError:
+    pq = None
+try:
+    from openpyxl import load_workbook
+except ImportError:
+    load_workbook = None
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
+
+
+class DataValidator:
+    """
+    Валидатор файлов данных с массовой обработкой через DuckDB.
+    """
+
+    def __init__(self, config: dict, max_error_examples: int = 1000, max_duplicate_examples: int = 10):
+        self.config = config
+        self.max_error_examples = max_error_examples
+        self.max_duplicate_examples = max_duplicate_examples
+        self._ref_cache: Dict[Tuple[str, str], Set[str]] = {}
+
+    # =========================================================================
+    # 1. ПОИСК СПРАВОЧНИКА С МАКСИМАЛЬНОЙ ДАТОЙ
+    # =========================================================================
+
+    def _find_reference_file_with_max_date(self, reference_name: str) -> Optional[str]:
+        """
+        Находит файл справочника в папке с максимальной датой.
+
+        Структура:
+            BASE_DATA_DIR/
+                {reference_name}/
+                    {YYYY-MM-DD}/          <- папка с максимальной датой
+                        {file}.parquet     <- файл с данными
+
+        Args:
+            reference_name: Имя справочника (например, "API-COMTRADE-CUSTOMS_CODES-1")
+
+        Returns:
+            Путь к файлу справочника или None если не найден
+        """
+        logger.debug(f"[Validator] Поиск справочника: {reference_name}")
+
+        # Путь к папке справочника
+        ref_dir = BASE_DATA_DIR / reference_name
+
+        if not ref_dir.exists() or not ref_dir.is_dir():
+            logger.warning(f"[Validator] Папка справочника не найдена: {ref_dir}")
+            return None
+
+        # Ищем папки с датами в формате YYYY-MM-DD
+        date_pattern = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+        date_dirs = []
+
+        for item in ref_dir.iterdir():
+            if item.is_dir() and date_pattern.match(item.name):
+                try:
+                    # Проверяем, что это валидная дата
+                    datetime.strptime(item.name, "%Y-%m-%d")
+                    date_dirs.append(item)
+                except ValueError:
+                    pass
+
+        if not date_dirs:
+            logger.warning(f"[Validator] Папок с датами не найдено в {ref_dir}")
+            # Если нет папок с датами, ищем файлы прямо в корне справочника
+            return self._find_file_in_directory(ref_dir)
+
+        # Сортируем по дате (от самой новой к старой)
+        date_dirs.sort(key=lambda x: x.name, reverse=True)
+
+        # Берём папку с максимальной датой
+        latest_date_dir = date_dirs[0]
+        logger.info(f"[Validator] Найдена папка с максимальной датой: {latest_date_dir.name}")
+
+        # Ищем файл в этой папке
+        file_path = self._find_file_in_directory(latest_date_dir)
+        if file_path:
+            logger.info(f"[Validator] Найден файл справочника: {file_path}")
+            return file_path
+
+        # Если в папке с максимальной датой нет файлов, ищем в других папках
+        for date_dir in date_dirs[1:]:
+            file_path = self._find_file_in_directory(date_dir)
+            if file_path:
+                logger.info(f"[Validator] Найден файл в папке {date_dir.name}: {file_path}")
+                return file_path
+
+        logger.warning(f"[Validator] Файлы не найдены в папках с датами: {ref_dir}")
+        return None
+
+    def _find_file_in_directory(self, directory: Path) -> Optional[str]:
+        """
+        Ищет файл данных в директории.
+        Приоритет: parquet > csv > xlsx > xls
+        """
+        # Ищем Parquet
+        parquet_files = list(directory.glob("*.parquet"))
+        if parquet_files:
+            parquet_files.sort(key=lambda x: x.name)
+            return str(parquet_files[0])
+
+        # Ищем CSV
+        csv_files = list(directory.glob("*.csv"))
+        if csv_files:
+            csv_files.sort(key=lambda x: x.name)
+            return str(csv_files[0])
+
+        # Ищем Excel
+        xlsx_files = list(directory.glob("*.xlsx"))
+        if xlsx_files:
+            xlsx_files.sort(key=lambda x: x.name)
+            return str(xlsx_files[0])
+
+        xls_files = list(directory.glob("*.xls"))
+        if xls_files:
+            xls_files.sort(key=lambda x: x.name)
+            return str(xls_files[0])
+
+        return None
+
+    # =========================================================================
+    # 2. ЗАГРУЗКА ЗНАЧЕНИЙ ИЗ СПРАВОЧНИКА
+    # =========================================================================
+
+    def _load_reference_set(self, reference_name: str, column_name: str) -> Set[str]:
+        """
+        Загружает значения из справочника в set.
+
+        Args:
+            reference_name: Имя справочника (например, "API-COMTRADE-CUSTOMS_CODES-1")
+            column_name: Имя колонки для извлечения значений
+
+        Returns:
+            Set с уникальными значениями
+        """
+        key = (reference_name, column_name)
+
+        # Проверяем кэш
+        if key in self._ref_cache:
+            logger.debug(f"[Validator] Справочник из кэша: {reference_name}.{column_name}")
+            return self._ref_cache[key]
+
+        logger.debug(f"[Validator] Загрузка справочника: {reference_name}.{column_name}")
+
+        # Находим файл справочника с максимальной датой
+        file_path = self._find_reference_file_with_max_date(reference_name)
+
+        if not file_path:
+            logger.error(f"[Validator] Справочник не найден: {reference_name}")
+            self._ref_cache[key] = set()
+            return set()
+
+        # Определяем расширение
+        ext = Path(file_path).suffix.lower().lstrip('.')
+
+        # Проверяем размер файла
+        file_size = Path(file_path).stat().st_size
+        if file_size == 0:
+            logger.error(f"[Validator] Справочник пуст: {file_path}")
+            self._ref_cache[key] = set()
+            return set()
+
+        logger.info(f"[Validator] Загрузка справочника: {file_path}, размер: {file_size} байт")
+
+        start_time = time.time()
+        values: Set[str] = set()
+
+        try:
+            # Используем DuckDB для быстрого чтения
+            safe_path = file_path.replace("'", "''")
+
+            with duckdb.connect() as conn:
+                # Определяем функцию чтения
+                if ext == 'parquet':
+                    table_expr = f"read_parquet('{safe_path}')"
+                elif ext == 'csv':
+                    table_expr = f"read_csv_auto('{safe_path}')"
+                elif ext in ('xlsx', 'xls'):
+                    # Для Excel используем fallback
+                    values = self._read_excel_fallback(file_path, column_name)
+                    elapsed_ms = round((time.time() - start_time) * 1000, 2)
+                    logger.info(f"[Validator] Справочник загружен: {len(values)} записей, elapsed_ms={elapsed_ms}")
+                    self._ref_cache[key] = values
+                    return values
+                else:
+                    logger.warning(f"[Validator] Неподдерживаемый формат: {ext}")
+                    self._ref_cache[key] = set()
+                    return set()
+
+                # Проверяем, существует ли колонка
+                try:
+                    describe_query = f"DESCRIBE SELECT * FROM {table_expr}"
+                    columns = conn.execute(describe_query).fetchall()
+                    column_names = [c[0] for c in columns]
+
+                    if column_name not in column_names:
+                        logger.error(
+                            f"[Validator] Колонка '{column_name}' не найдена в справочнике. "
+                            f"Доступные колонки: {column_names[:10]}..."
+                        )
+                        self._ref_cache[key] = set()
+                        return set()
+
+                except Exception as e:
+                    logger.warning(f"[Validator] Не удалось проверить схему: {e}")
+
+                # Загружаем уникальные значения
+                query = f"""
+                    SELECT DISTINCT CAST("{column_name}" AS VARCHAR)
+                    FROM {table_expr}
+                    WHERE "{column_name}" IS NOT NULL
+                      AND TRIM(CAST("{column_name}" AS VARCHAR)) != ''
+                """
+                result = conn.execute(query).fetchall()
+
+                for row in result:
+                    if row[0] is not None and str(row[0]).strip():
+                        values.add(str(row[0]).strip())
+
+        except Exception as e:
+            logger.error(f"[Validator] Ошибка загрузки справочника {file_path}: {e}", exc_info=True)
+
+        elapsed_ms = round((time.time() - start_time) * 1000, 2)
+
+        if len(values) == 0:
+            logger.warning(f"[Validator] В справочнике не найдено значений: {reference_name}.{column_name}")
+        else:
+            logger.info(
+                f"[Validator] Справочник загружен: {len(values)} записей, "
+                f"примеры: {list(values)[:5]}, elapsed_ms={elapsed_ms}"
+            )
+
+        self._ref_cache[key] = values
+        return values
+
+    def _read_excel_fallback(self, file_path: str, column_name: str) -> Set[str]:
+        """Читает Excel-файл через openpyxl или xlrd."""
+        values: Set[str] = set()
+        ext = Path(file_path).suffix.lower()
+
+        try:
+            if ext == '.xlsx' and load_workbook:
+                wb = load_workbook(file_path, read_only=True)
+                ws = wb.active
+                header = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=True))]
+                try:
+                    col_idx = header.index(column_name)
+                except ValueError:
+                    wb.close()
+                    logger.error(f"[Validator] Колонка '{column_name}' не найдена в Excel")
+                    return values
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    v = row[col_idx] if col_idx < len(row) else None
+                    if v is not None and str(v).strip():
+                        values.add(str(v).strip())
+                wb.close()
+
+            elif ext == '.xls' and xlrd:
+                book = xlrd.open_workbook(file_path, on_demand=True)
+                sheet = book.sheet_by_index(0)
+                header = sheet.row_values(0)
+                try:
+                    col_idx = header.index(column_name)
+                except ValueError:
+                    logger.error(f"[Validator] Колонка '{column_name}' не найдена в XLS")
+                    return values
+                for row_idx in range(1, sheet.nrows):
+                    v = sheet.cell_value(row_idx, col_idx)
+                    if v is not None and str(v).strip():
+                        values.add(str(v).strip())
+
+        except Exception as e:
+            logger.error(f"[Validator] Ошибка чтения Excel {file_path}: {e}")
+
+        return values
+
+    def _preload_reference_sets(self, column_rules: Dict) -> Dict[Tuple[str, str], Set[str]]:
+        """Предзагружает все справочники."""
+        ref_sets = {}
+        for col, rules in column_rules.items():
+            for check in rules.get('checks', []):
+                if 'reference_file' in check and 'reference_column' in check:
+                    key = (check['reference_file'], check['reference_column'])
+                    if key not in ref_sets:
+                        logger.debug(f"[Validator] Загрузка справочника для колонки {col}: {key}")
+                        ref_sets[key] = self._load_reference_set(
+                            check['reference_file'],
+                            check['reference_column']
+                        )
+
+        logger.debug(f"[Validator] Загружено {len(ref_sets)} справочников")
+        return ref_sets
+
+    # =========================================================================
+    # 3. ОСНОВНАЯ ВАЛИДАЦИЯ
+    # =========================================================================
+
+    def validate_file(self, file_path: str, source_name: str) -> Dict[str, Any]:
+        """
+        Выполняет полную валидацию файла.
+        """
+        start_time = time.time()
+        logger.info(f"[Validator] Начало валидации: source={source_name}, file={file_path}")
+
+        # 1. Проверка конфигурации
+        if source_name not in self.config:
+            error_msg = f"Источник {source_name} не найден в конфигурации"
+            logger.error(f"[Validator] {error_msg}")
+            return {"error": error_msg}
+
+        column_rules = self.config[source_name]
+        logger.debug(f"[Validator] Загружены правила для {len(column_rules)} колонок")
+
+        # 2. Разрешение пути к проверяемому файлу
+        resolved_file_path = self._resolve_file_path(file_path)
+        logger.debug(f"[Validator] Разрешённый путь: {resolved_file_path}")
+
+        ext = Path(resolved_file_path).suffix.lower().lstrip('.')
+        if ext not in ('csv', 'parquet', 'xlsx', 'xls'):
+            error_msg = f"Неподдерживаемый формат: {ext}"
+            logger.error(f"[Validator] {error_msg}")
+            return {"error": error_msg}
+
+        # 3. Проверка заголовков
+        actual_columns = self._get_columns(resolved_file_path, ext)
+        if actual_columns is None:
+            error_msg = f"Не удалось прочитать заголовки {resolved_file_path}"
+            logger.error(f"[Validator] {error_msg}")
+            return {"error": error_msg}
+
+        required_cols = [c for c, r in column_rules.items() if r.get('required', False)]
+        missing = [c for c in required_cols if c not in actual_columns]
+        if missing:
+            error_msg = f"Отсутствуют обязательные колонки: {missing}"
+            logger.error(f"[Validator] {error_msg}")
+            return {"error": error_msg}
+
+        # 4. Выбор метода валидации
+        if ext in ('parquet', 'csv'):
+            result = self._validate_with_duckdb(resolved_file_path, ext, column_rules, start_time)
+        else:
+            result = self._validate_excel(resolved_file_path, ext, column_rules, start_time)
+
+        result["source"] = source_name
+        return result
+
+    def _resolve_file_path(self, file_path: str) -> str:
+        """Преобразует относительный путь в абсолютный."""
+        path = Path(file_path)
+        
+        # Если путь абсолютный - возвращаем
+        if path.is_absolute():
+            return str(path)
+        
+        # Пробуем через BASE_DATA_DIR
+        full_path = BASE_DATA_DIR / file_path
+        if full_path.exists():
+            return str(full_path)
+        
+        # Если не найден - возвращаем как есть
+        return str(path)
+
+    # =========================================================================
+    # 4. МАССОВАЯ ВАЛИДАЦИЯ ЧЕРЕЗ DUCKDB
+    # =========================================================================
+
+    def _validate_with_duckdb(self, file_path: str, ext: str, column_rules: Dict, start_time: float) -> Dict[str, Any]:
+        """Выполняет массовую валидацию через DuckDB."""
+        safe_path = file_path.replace("'", "''")
+
+        if ext == 'parquet':
+            table_expr = f"read_parquet('{safe_path}')"
+        elif ext == 'csv':
+            table_expr = f"read_csv_auto('{safe_path}')"
+        else:
+            return {"error": f"Неподдерживаемый формат для DuckDB: {ext}"}
+
+        with duckdb.connect() as conn:
+            # Получаем общее количество строк
+            count_query = f"SELECT COUNT(*) FROM {table_expr}"
+            total_rows = conn.execute(count_query).fetchone()[0]
+            logger.info(f"[Validator] Всего строк в файле: {total_rows}")
+
+            if total_rows == 0:
+                return {
+                    "file": file_path,
+                    "total_rows": 0,
+                    "status": "OK",
+                    "error_summary": {},
+                    "errors": []
+                }
+
+            # Загружаем справочники
+            ref_sets = self._preload_reference_sets(column_rules)
+
+            # Создаём временные таблицы для справочников
+            ref_tables = {}
+            for (ref_name, ref_col), ref_set in ref_sets.items():
+                if ref_set:
+                    table_name = f"ref_{abs(hash(ref_name))}_{abs(hash(ref_col))}".replace('-', '_')
+                    conn.execute(f"CREATE TEMPORARY TABLE {table_name} (value VARCHAR)")
+                    conn.executemany(f"INSERT INTO {table_name} VALUES (?)", [(v,) for v in ref_set])
+                    ref_tables[(ref_name, ref_col)] = table_name
+                    logger.debug(f"[Validator] Создана временная таблица {table_name} с {len(ref_set)} записями")
+
+            # Формируем запросы для проверки
+            error_queries = []
+            unique_checks = []
+
+            for col, rules in column_rules.items():
+                col_safe = col.replace('"', '""')
+                col_quoted = f'"{col_safe}"'
+
+                # Проверка обязательности (NOT NULL)
+                if rules.get('required', False):
+                    null_query = f"""
+                        SELECT 
+                            'required_null' as category,
+                            '{col}' as column_name,
+                            NULL as value,
+                            'Поле не может быть NULL' as error_text,
+                            COUNT(*) as count,
+                            MIN(row_num) as first_row
+                        FROM (
+                            SELECT row_number() OVER () as row_num, *
+                            FROM {table_expr}
+                        ) t
+                        WHERE {col_quoted} IS NULL OR TRIM(CAST({col_quoted} AS VARCHAR)) = ''
+                        HAVING COUNT(*) > 0
+                    """
+                    error_queries.append(null_query)
+
+                # Проверка справочников
+                for check in rules.get('checks', []):
+                    if 'reference_file' in check and 'reference_column' in check:
+                        ref_key = (check['reference_file'], check['reference_column'])
+                        ref_table = ref_tables.get(ref_key)
+
+                        if ref_table:
+                            # Проверяем, есть ли значения в справочнике
+                            ref_query = f"""
+                                SELECT 
+                                    'reference_failed' as category,
+                                    '{col}' as column_name,
+                                    CAST({col_quoted} AS VARCHAR) as value,
+                                    'Значение не найдено в справочнике' as error_text,
+                                    COUNT(*) as count,
+                                    MIN(row_num) as first_row
+                                FROM (
+                                    SELECT row_number() OVER () as row_num, *
+                                    FROM {table_expr}
+                                ) t
+                                WHERE {col_quoted} IS NOT NULL 
+                                  AND TRIM(CAST({col_quoted} AS VARCHAR)) != ''
+                                  AND CAST({col_quoted} AS VARCHAR) NOT IN (SELECT value FROM {ref_table})
+                                GROUP BY CAST({col_quoted} AS VARCHAR)
+                                HAVING COUNT(*) > 0
+                            """
+                            error_queries.append(ref_query)
+                        else:
+                            # Справочник не загружен — записываем ошибку для всех значений
+                            ref_query = f"""
+                                SELECT 
+                                    'reference_not_loaded' as category,
+                                    '{col}' as column_name,
+                                    CAST({col_quoted} AS VARCHAR) as value,
+                                    'Справочник не загружен' as error_text,
+                                    COUNT(*) as count,
+                                    MIN(row_num) as first_row
+                                FROM (
+                                    SELECT row_number() OVER () as row_num, *
+                                    FROM {table_expr}
+                                ) t
+                                WHERE {col_quoted} IS NOT NULL 
+                                  AND TRIM(CAST({col_quoted} AS VARCHAR)) != ''
+                                GROUP BY CAST({col_quoted} AS VARCHAR)
+                                HAVING COUNT(*) > 0
+                            """
+                            error_queries.append(ref_query)
+
+                # Проверка уникальности
+                if rules.get('unique', False):
+                    unique_checks.append(col)
+
+            # Проверка уникальности
+            for col in unique_checks:
+                col_safe = col.replace('"', '""')
+                col_quoted = f'"{col_safe}"'
+
+                unique_query = f"""
+                    WITH ranked AS (
+                        SELECT 
+                            {col_quoted} as value,
+                            row_number() OVER () as row_num,
+                            COUNT(*) OVER (PARTITION BY {col_quoted}) as cnt
+                        FROM {table_expr}
+                        WHERE {col_quoted} IS NOT NULL
+                          AND TRIM(CAST({col_quoted} AS VARCHAR)) != ''
+                    )
+                    SELECT 
+                        'duplicate' as category,
+                        '{col}' as column_name,
+                        CAST(value AS VARCHAR) as value,
+                        'Дубликат' as error_text,
+                        cnt as count,
+                        MIN(row_num) as first_row
+                    FROM ranked
+                    WHERE cnt > 1
+                    GROUP BY value, cnt
+                    LIMIT {self.max_duplicate_examples}
+                """
+                error_queries.append(unique_query)
+
+            # Выполняем все запросы
+            all_errors = []
+            for query in error_queries:
+                try:
+                    result = conn.execute(query).fetchall()
+                    for row in result:
+                        all_errors.append({
+                            "category": row[0],
+                            "column_name": row[1],
+                            "value": row[2],
+                            "error_text": row[3],
+                            "count": row[4],
+                            "row_num": row[5]
+                        })
+                except Exception as e:
+                    logger.warning(f"[Validator] Ошибка выполнения запроса: {e}")
+
+            # Формируем результат
+            error_summary = {}
+            for err in all_errors:
+                category = err["category"]
+                error_summary[category] = error_summary.get(category, 0) + err["count"]
+
+            all_errors.sort(key=lambda x: x["count"], reverse=True)
+
+            elapsed_ms = round((time.time() - start_time) * 1000, 2)
+            status = "OK" if not all_errors else "FAIL"
+
+            logger.info(
+                f"[Validator] Завершено: status={status}, rows={total_rows}, "
+                f"errors={len(all_errors)}, elapsed_ms={elapsed_ms}"
+            )
+
+            return {
+                "file": file_path,
+                "total_rows": total_rows,
+                "status": status,
+                "error_summary": error_summary,
+                "errors": all_errors[:self.max_error_examples],
+            }
+
+    # =========================================================================
+    # 5. ВАЛИДАЦИЯ EXCEL (построчная)
+    # =========================================================================
+
+    def _validate_excel(self, file_path: str, ext: str, column_rules: Dict, start_time: float) -> Dict[str, Any]:
+        """Валидация Excel-файла (построчная)."""
+        errors = []
+        error_summary = {}
+        total_rows = 0
+
+        try:
+            ref_sets = self._preload_reference_sets(column_rules)
+
+            if ext == 'xlsx' and load_workbook:
+                wb = load_workbook(file_path, read_only=True)
+                ws = wb.active
+                header = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=True))]
+                col_index = {h: i for i, h in enumerate(header) if h is not None}
+
+                for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=1):
+                    total_rows += 1
+                    row_dict = {
+                        col: row[col_index[col]] if col in col_index else None
+                        for col in column_rules
+                    }
+                    self._process_row_excel(row_dict, row_num, column_rules, ref_sets, errors, error_summary)
+
+                wb.close()
+
+            elif ext == 'xls' and xlrd:
+                book = xlrd.open_workbook(file_path, on_demand=True)
+                sheet = book.sheet_by_index(0)
+                header = sheet.row_values(0)
+                col_index = {h: i for i, h in enumerate(header) if h}
+
+                for row_num in range(1, sheet.nrows):
+                    total_rows += 1
+                    row_dict = {
+                        col: sheet.cell_value(row_num, col_index[col]) if col in col_index else None
+                        for col in column_rules
+                    }
+                    self._process_row_excel(row_dict, row_num, column_rules, ref_sets, errors, error_summary)
+
+            else:
+                return {"error": f"Библиотека для чтения {ext} не установлена"}
+
+        except Exception as e:
+            logger.error(f"[Validator] Ошибка валидации Excel {file_path}: {e}", exc_info=True)
+            return {"error": f"Ошибка валидации Excel: {e}"}
+
+        elapsed_ms = round((time.time() - start_time) * 1000, 2)
+        status = "OK" if not errors else "FAIL"
+
+        return {
+            "file": file_path,
+            "total_rows": total_rows,
+            "status": status,
+            "error_summary": error_summary,
+            "errors": errors[:self.max_error_examples],
+        }
+
+    def _process_row_excel(self, row: Dict, row_num: int, column_rules: Dict,
+                           ref_sets: Dict, errors: List, error_summary: Dict) -> None:
+        """Обрабатывает одну строку Excel."""
+        for col, rules in column_rules.items():
+            value = row.get(col)
+            value_str = str(value).strip() if value is not None else ""
+
+            # Проверка обязательности
+            if rules.get('required', False) and (value is None or value_str == ''):
+                errors.append({
+                    "category": "required_null",
+                    "column_name": col,
+                    "value": None,
+                    "error_text": "Поле не может быть NULL",
+                    "count": 1,
+                    "row_num": row_num
+                })
+                error_summary["required_null"] = error_summary.get("required_null", 0) + 1
+
+            # Проверка справочников
+            for check in rules.get('checks', []):
+                if 'reference_file' not in check or 'reference_column' not in check:
+                    continue
+
+                ref_key = (check['reference_file'], check['reference_column'])
+                ref_set = ref_sets.get(ref_key)
+
+                if value is not None and value_str:
+                    if ref_set is None:
+                        errors.append({
+                            "category": "reference_not_loaded",
+                            "column_name": col,
+                            "value": value_str,
+                            "error_text": "Справочник не загружен",
+                            "count": 1,
+                            "row_num": row_num
+                        })
+                        error_summary["reference_not_loaded"] = error_summary.get("reference_not_loaded", 0) + 1
+                    elif value_str not in ref_set:
+                        errors.append({
+                            "category": "reference_failed",
+                            "column_name": col,
+                            "value": value_str,
+                            "error_text": f"Значение не найдено в справочнике {check['reference_file']}",
+                            "count": 1,
+                            "row_num": row_num
+                        })
+                        error_summary["reference_failed"] = error_summary.get("reference_failed", 0) + 1
+                elif check.get('is_null') is False:
+                    errors.append({
+                        "category": "required_null",
+                        "column_name": col,
+                        "value": None,
+                        "error_text": f"Поле не может быть NULL",
+                        "count": 1,
+                        "row_num": row_num
+                    })
+                    error_summary["required_null"] = error_summary.get("required_null", 0) + 1
+
+    # =========================================================================
+    # 6. ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    # =========================================================================
+    def _get_columns(self, file_path: str, ext: str) -> Optional[List[str]]:
+    """Извлекает список колонок из файла."""
+    import pyarrow.parquet as pq
+    import duckdb
+    
+    try:
+        logger.info(f"[Validator] _get_columns: file_path={file_path}, ext={ext}")
+        
+        # Проверяем, что файл существует
+        if not Path(file_path).exists():
+            logger.error(f"[Validator] Файл не существует: {file_path}")
+            return None
+
+        if ext == 'csv':
+            with open(file_path, 'r', encoding='utf-8') as f:
+                header = next(csv.reader(f), [])
+                columns = [h.strip() for h in header]
+                logger.info(f"[Validator] Найдено {len(columns)} колонок в CSV")
+                return columns
+
+        if ext == 'parquet':
+            # Пробуем через pyarrow
+            try:
+                schema = pq.read_schema(file_path)
+                columns = list(schema.names)
+                logger.info(f"[Validator] Найдено {len(columns)} колонок в Parquet (pyarrow)")
+                return columns
+            except Exception as e:
+                logger.warning(f"[Validator] pyarrow error: {e}, пробуем DuckDB")
+                
+                # Пробуем через DuckDB
+                try:
+                    result = duckdb.sql(f"DESCRIBE SELECT * FROM read_parquet('{file_path}')").fetchall()
+                    columns = [row[0] for row in result]
+                    logger.info(f"[Validator] Найдено {len(columns)} колонок в Parquet (DuckDB)")
+                    return columns
+                except Exception as e2:
+                    logger.error(f"[Validator] DuckDB тоже ошибка: {e2}")
+                    return None
+
+        if ext == 'xlsx' and load_workbook:
+            wb = load_workbook(file_path, read_only=True)
+            ws = wb.active
+            header = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+            columns = [str(cell).strip() if cell else '' for cell in header]
+            wb.close()
+            logger.debug(f"[Validator] Найдено {len(columns)} колонок в XLSX")
+            return columns
+
+        if ext == 'xls' and xlrd:
+            book = xlrd.open_workbook(file_path, on_demand=True)
+            columns = [str(cell).strip() for cell in book.sheet_by_index(0).row_values(0)]
+            logger.debug(f"[Validator] Найдено {len(columns)} колонок в XLS")
+            return columns
+
+        logger.warning(f"[Validator] Неподдерживаемый формат или отсутствует библиотека: {ext}")
+
+    except Exception as e:
+        logger.error(f"[Validator] Ошибка чтения заголовков {file_path}: {e}", exc_info=True)
+
+    return None
