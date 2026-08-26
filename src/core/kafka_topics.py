@@ -10,14 +10,14 @@ from src.core.logger import logger
 
 def get_required_topics() -> List[str]:
     topics = [
-        get_env("APP_ECOMRU_KAFKA_TOPIC_DOWNLOAD", "ecomru-download"),
-        get_env("APP_ECOMRU_KAFKA_TOPIC_VERIFICATION", "ecomru-verification"),
-        get_env("APP_ECOMRU_KAFKA_TOPIC_TRANSFER", "ecomru-transfer"),
-        get_env("APP_ECOMRU_KAFKA_TOPIC_PROCESS_FOLDER", "ecomru-process-folder"),
-        get_env("APP_ECOMRU_KAFKA_TOPIC_PROCESS_FOLDER_RESULT", "ecomru-process-folder-result"),
-        get_env("APP_LINK_KAFKA_TOPIC", "ecomru-links-topic"),
-        # === НОВОЕ ===
-        get_env("APP_ECOMRU_KAFKA_TOPIC_REPORT", "ecomru-report"),
+        get_env("APP_ECOMRU_KAFKA_TOPIC_DOWNLOAD",             "ecomru-download"),
+        get_env("APP_ECOMRU_KAFKA_TOPIC_VERIFICATION",         "ecomru-verification"),
+        get_env("APP_ECOMRU_KAFKA_TOPIC_TRANSFER",             "ecomru-transfer"),
+        get_env("APP_ECOMRU_KAFKA_TOPIC_PROCESS_FOLDER",       "ecomru-process-folder"),
+        get_env("APP_ECOMRU_KAFKA_TOPIC_PROCESS_FOLDER_RESULT","ecomru-process-folder-result"),
+        get_env("APP_LINK_KAFKA_TOPIC",                        "ecomru-links-topic"),
+        get_env("APP_ECOMRU_KAFKA_TOPIC_REPORT",               "ecomru-report"),
+        get_env("APP_VALIDATOR_KAFKA_TOPIC_OUTPUT",            "ecomru-validation"),
     ]
     seen = set()
     unique = []
@@ -92,5 +92,12 @@ def get_topics_info() -> List[Dict[str, Any]]:
             "role": "producer",
             "app": "app_ecomru",
             "description": "Итоговый отчёт pipeline для Airflow",
+        },
+        {
+            "name": get_env("APP_VALIDATOR_KAFKA_TOPIC_OUTPUT", "ecomru-validation"),
+            "group_id": get_env("APP_VALIDATOR_KAFKA_GROUP_ID", "data-validator-group"),
+            "role": "producer",
+            "app": "app_data_validator",
+            "description": "Результаты валидации файлов после скачивания",
         },
     ]

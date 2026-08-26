@@ -95,6 +95,16 @@ async def lifespan(app: FastAPI):
             PROCESS_FOLDER_GROUP_ID,
             handle_process_folder_task
         )
+        kafka_client.register_consumer(
+            KAFKA_VALIDATION_INPUT_TOPIC,
+            KAFKA_VALIDATION_INPUT_GROUP,
+            ValidationService.handle_validation_task
+        )
+        logger.info(
+            f"[KAFKA] Валидатор зарегистрирован: "
+            f"topic={KAFKA_VALIDATION_INPUT_TOPIC}, "
+            f"group={KAFKA_VALIDATION_INPUT_GROUP}"
+        )
 
         # Запускаем консьюмеров в фоновом режиме
         asyncio.create_task(kafka_client.run_consumers())
