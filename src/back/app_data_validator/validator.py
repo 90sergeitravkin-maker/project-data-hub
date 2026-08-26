@@ -11,7 +11,6 @@ import duckdb
 from datetime import datetime, date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
-
 from src.core.logger import logger
 from src.back.app_data_validator.config import BASE_DATA_DIR
 
@@ -19,10 +18,12 @@ try:
     import pyarrow.parquet as pq
 except ImportError:
     pq = None
+
 try:
     from openpyxl import load_workbook
 except ImportError:
     load_workbook = None
+
 try:
     import xlrd
 except ImportError:
@@ -33,7 +34,6 @@ class DataValidator:
     """
     Валидатор файлов данных с массовой обработкой через DuckDB.
     """
-
     SUPPORTED_EXTENSIONS = {'csv', 'parquet', 'xlsx', 'xls'}
     SUPPORTED_EXTENSIONS_DISPLAY = ['CSV', 'Parquet', 'XLSX', 'XLS']
 
@@ -46,21 +46,18 @@ class DataValidator:
     # =========================================================================
     # 1. ПОИСК СПРАВОЧНИКА С МАКСИМАЛЬНОЙ ДАТОЙ
     # =========================================================================
-
     def _find_reference_file_with_max_date(self, reference_name: str) -> Optional[str]:
         """
         Находит файл справочника в папке с максимальной датой.
         """
         logger.debug(f"[Validator] Поиск справочника: {reference_name}")
         ref_dir = BASE_DATA_DIR / reference_name
-
         if not ref_dir.exists() or not ref_dir.is_dir():
             logger.warning(f"[Validator] Папка справочника не найдена: {ref_dir}")
             return None
 
         date_pattern = re.compile(r'^\d{4}-\d{2}-\d{2}$')
         date_dirs = []
-
         for item in ref_dir.iterdir():
             if item.is_dir() and date_pattern.match(item.name):
                 try:
@@ -103,7 +100,6 @@ class DataValidator:
     # =========================================================================
     # 2. ЗАГРУЗКА ЗНАЧЕНИЙ ИЗ СПРАВОЧНИКА
     # =========================================================================
-
     def _load_reference_set(self, reference_name: str, column_name: str) -> Set[str]:
         key = (reference_name, column_name)
         if key in self._ref_cache:
@@ -112,7 +108,6 @@ class DataValidator:
 
         logger.debug(f"[Validator] Загрузка справочника: {reference_name}.{column_name}")
         file_path = self._find_reference_file_with_max_date(reference_name)
-
         if not file_path:
             logger.error(f"[Validator] Справочник не найден: {reference_name}")
             self._ref_cache[key] = set()
@@ -151,7 +146,6 @@ class DataValidator:
                     describe_query = f"DESCRIBE SELECT * FROM {table_expr}"
                     columns = conn.execute(describe_query).fetchall()
                     column_names = [c[0] for c in columns]
-
                     if column_name not in column_names:
                         logger.error(
                             f"[Validator] Колонка '{column_name}' не найдена. Доступные: {column_names[:10]}...")
@@ -161,16 +155,15 @@ class DataValidator:
                     logger.warning(f"[Validator] Не удалось проверить схему: {e}")
 
                 query = f"""
-                    SELECT DISTINCT CAST("{column_name}" AS VARCHAR)
-                    FROM {table_expr}
-                    WHERE "{column_name}" IS NOT NULL
-                      AND TRIM(CAST("{column_name}" AS VARCHAR)) != ''
+                    SELECT DISTINCT CAST("{column_name}" AS VARCHAR) 
+                    FROM {table_expr} 
+                    WHERE "{column_name}" IS NOT NULL 
+                    AND TRIM(CAST("{column_name}" AS VARCHAR)) != ''
                 """
                 result = conn.execute(query).fetchall()
                 for row in result:
                     if row[0] is not None and str(row[0]).strip():
                         values.add(str(row[0]).strip())
-
         except Exception as e:
             logger.error(f"[Validator] Ошибка загрузки справочника {file_path}: {e}", exc_info=True)
 
@@ -231,57 +224,34 @@ class DataValidator:
     # =========================================================================
     # 3. ОСНОВНАЯ ВАЛИДАЦИЯ (Файл или Директория)
     # =========================================================================
-    # src/back/app_data_validator/validator.py
-
-    # Добавьте этот метод в класс DataValidator
-
     def _extract_source_from_path(self, file_path: str) -> Optional[str]:
         """
         Извлекает имя источника из начала пути.
         Ищет совпадение с ключами self.config.
-
-        Args:
-            file_path: Путь к файлу (например, "API-COMTRADE-WORLD_TRADE-1/2026-06-16/2022")
-
-        Returns:
-            Имя источника или None, если не найдено
         """
-        # Нормализуем путь
         normalized_path = file_path.replace('\\', '/').strip('/')
         parts = normalized_path.split('/')
-
         if not parts:
             return None
 
-        # Пробуем найти совпадение по первой части пути
         first_part = parts[0]
-
-        # Проверяем точное совпадение
         if first_part in self.config:
             return first_part
 
-        # Проверяем частичное совпадение (регистронезависимо)
         first_part_lower = first_part.lower()
         for source in self.config.keys():
             if source.lower() == first_part_lower:
                 return source
 
-        # Если не нашли по первой части, пробуем найти любой ключ,
-        # который содержится в пути
         for source in self.config.keys():
             if source in normalized_path or normalized_path in source:
                 return source
 
-        # Если ничего не нашли, возвращаем None
         return None
 
     def validate_file(self, file_path: str, source_name: str) -> Dict[str, Any]:
         """
         Валидация файла или директории.
-
-        Args:
-            file_path: Путь к файлу или директории
-            source_name: Имя источника (уже извлечено из пути в ValidationService)
         """
         start_time = time.time()
         logger.info(f"[Validator] Начало валидации: source={source_name}, path={file_path}")
@@ -293,9 +263,6 @@ class DataValidator:
         resolved_path = self._resolve_file_path(file_path)
         path_obj = Path(resolved_path)
 
-        # ============================================================
-        # ПРОВЕРКА: существует ли путь
-        # ============================================================
         if not path_obj.exists():
             return {
                 "error": f"Путь не существует: {file_path}",
@@ -306,10 +273,7 @@ class DataValidator:
             }
 
         # ============================================================
-        # ОБРАБОТКА: если путь указывает на директорию
-        # ============================================================
-        # ============================================================
-        # ОБРАБОТКА: если путь указывает на директорию
+        # ОБРАБОТКА: если путь указывает на директорию (ИСПРАВЛЕНО: rglob)
         # ============================================================
         if path_obj.is_dir():
             supported_exts = {f'.{ext}' for ext in self.SUPPORTED_EXTENSIONS}
@@ -385,14 +349,11 @@ class DataValidator:
     def _find_similar_columns(self, missing: List[str], available: List[str]) -> Dict[str, List[str]]:
         suggestions = {}
         available_lower = {col.lower(): col for col in available}
-
         for col in missing:
             col_lower = col.lower()
             similar = []
-
             if col_lower in available_lower:
                 similar.append(f"ТОЧНОЕ СОВПАДЕНИЕ (регистр): {available_lower[col_lower]}")
-
             for avail in available:
                 avail_lower = avail.lower()
                 if col_lower in avail_lower or avail_lower in col_lower:
@@ -402,26 +363,21 @@ class DataValidator:
                 avail_normalized = avail_lower.replace('_', ' ').replace('-', ' ')
                 if col_normalized == avail_normalized and avail not in similar:
                     similar.append(avail)
-
             suggestions[col] = similar[:5] if similar else []
-
         return suggestions
 
     # =========================================================================
     # 4. ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
     # =========================================================================
-
     @staticmethod
     def _resolve_file_path(file_path: str) -> str:
         """Преобразует путь в абсолютный с проверкой структуры."""
         path = Path(file_path)
-
         if path.is_absolute():
             if path.exists():
                 return str(path)
 
         absolute_path = BASE_DATA_DIR / file_path
-
         parts = Path(file_path).parts
         if len(parts) >= 3:
             entity_path = BASE_DATA_DIR / parts[0]
@@ -437,7 +393,6 @@ class DataValidator:
 
         if absolute_path.exists():
             return str(absolute_path)
-
         return str(absolute_path)
 
     def _validate_directory(self, dir_path: Path, source_name: str, column_rules: Dict, start_time: float) -> Dict[
@@ -466,43 +421,43 @@ class DataValidator:
             logger.info(f"[Validator] Обработка файла: {file_path.name}")
 
             actual_columns = self._get_columns(str(file_path), ext)
-
             if first_file_columns is None and actual_columns:
                 first_file_columns = actual_columns
-                missing = [c for c in required_cols if c not in actual_columns]
-                if missing:
-                    all_errors.append({
-                        "category": "schema_mismatch",
-                        "column_name": ", ".join(missing),
-                        "value": file_path.name,
-                        "error_text": f"В файлах отсутствуют обязательные колонки: {missing}",
-                        "count": len(files_to_process),
-                        "row_num": None,
-                        "file_name": file_path.name
-                    })
-                    error_summary["schema_mismatch"] = len(files_to_process)
-                    logger.error(
-                        f"[Validator] СХЕМА НЕ СОВПАДАЕТ! "
-                        f"Обязательные колонки: {required_cols}, "
-                        f"Доступные: {actual_columns[:20]}..."
-                    )
-                    return {
-                        "file": str(dir_path),
-                        "source": source_name,
-                        "total_rows": 0,
-                        "status": "FAIL",
-                        "error_summary": error_summary,
-                        "errors": all_errors,
-                        "files_processed": [],
-                        "diagnostic": {
-                            "required_columns": required_cols,
-                            "actual_columns_sample": actual_columns[:20],
-                            "missing_columns": missing,
-                            "hint": f"Схема файлов не соответствует ожидаемой. "
-                                    f"Проверьте, что вы используете правильный source_name. "
-                                    f"Доступные источники: {list(self.config.keys())}"
-                        }
+
+            missing = [c for c in required_cols if c not in actual_columns]
+            if missing:
+                all_errors.append({
+                    "category": "schema_mismatch",
+                    "column_name": ", ".join(missing),
+                    "value": file_path.name,
+                    "error_text": f"В файлах отсутствуют обязательные колонки: {missing}",
+                    "count": len(files_to_process),
+                    "row_num": None,
+                    "file_name": file_path.name
+                })
+                error_summary["schema_mismatch"] = len(files_to_process)
+                logger.error(
+                    f"[Validator] СХЕМА НЕ СОВПАДАЕТ! "
+                    f"Обязательные колонки: {required_cols}, "
+                    f"Доступные: {actual_columns[:20]}..."
+                )
+                return {
+                    "file": str(dir_path),
+                    "source": source_name,
+                    "total_rows": 0,
+                    "status": "FAIL",
+                    "error_summary": error_summary,
+                    "errors": all_errors,
+                    "files_processed": [],
+                    "diagnostic": {
+                        "required_columns": required_cols,
+                        "actual_columns_sample": actual_columns[:20],
+                        "missing_columns": missing,
+                        "hint": f"Схема файлов не соответствует ожидаемой. "
+                                f"Проверьте, что вы используете правильный source_name. "
+                                f"Доступные источники: {list(self.config.keys())}"
                     }
+                }
 
             if actual_columns is None:
                 all_errors.append({
@@ -517,7 +472,6 @@ class DataValidator:
                 error_summary["file_processing_error"] = error_summary.get("file_processing_error", 0) + 1
                 continue
 
-            # Проверяем обязательные колонки для каждого файла
             missing = [c for c in required_cols if c not in actual_columns]
             if missing:
                 all_errors.append({
@@ -551,7 +505,7 @@ class DataValidator:
                 continue
 
             total_rows += result.get("total_rows", 0)
-            files_processed.append(file_path.name)
+            files_processed.append(str(file_path.relative_to(dir_path)))  # Относительный путь для удобства
 
             for err in result.get("errors", []):
                 err["file_name"] = file_path.name
@@ -592,9 +546,6 @@ class DataValidator:
     # =========================================================================
     # 5. МАССОВАЯ ВАЛИДАЦИЯ ЧЕРЕЗ DUCKDB
     # =========================================================================
-
-    # src/back/app_data_validator/validator.py
-
     def _validate_with_duckdb(self, file_path: str, ext: str, column_rules: Dict, start_time: float) -> Dict[str, Any]:
         safe_path = file_path.replace("'", "''")
         table_expr = f"read_parquet('{safe_path}')" if ext == 'parquet' else f"read_csv_auto('{safe_path}')"
@@ -622,7 +573,7 @@ class DataValidator:
 
                 if rules.get('required', False):
                     error_queries.append(f"""
-                        SELECT 'required_null' as category, '{col}' as column_name, NULL as value,
+                        SELECT 'required_null' as category, '{col}' as column_name, NULL as value, 
                                'Поле не может быть NULL' as error_text, COUNT(*) as count, MIN(row_num) as first_row
                         FROM (SELECT row_number() OVER () as row_num, * FROM {table_expr}) t
                         WHERE {col_quoted} IS NULL OR TRIM(CAST({col_quoted} AS VARCHAR)) = ''
@@ -635,7 +586,7 @@ class DataValidator:
                         ref_table = ref_tables.get(ref_key)
                         if ref_table:
                             error_queries.append(f"""
-                                SELECT 'reference_failed' as category, '{col}' as column_name, CAST({col_quoted} AS VARCHAR) as value,
+                                SELECT 'reference_failed' as category, '{col}' as column_name, CAST({col_quoted} AS VARCHAR) as value, 
                                        'Значение не найдено в справочнике' as error_text, COUNT(*) as count, MIN(row_num) as first_row
                                 FROM (SELECT row_number() OVER () as row_num, * FROM {table_expr}) t
                                 WHERE {col_quoted} IS NOT NULL AND TRIM(CAST({col_quoted} AS VARCHAR)) != ''
@@ -644,7 +595,7 @@ class DataValidator:
                             """)
                         else:
                             error_queries.append(f"""
-                                SELECT 'reference_not_loaded' as category, '{col}' as column_name, CAST({col_quoted} AS VARCHAR) as value,
+                                SELECT 'reference_not_loaded' as category, '{col}' as column_name, CAST({col_quoted} AS VARCHAR) as value, 
                                        'Справочник не загружен' as error_text, COUNT(*) as count, MIN(row_num) as first_row
                                 FROM (SELECT row_number() OVER () as row_num, * FROM {table_expr}) t
                                 WHERE {col_quoted} IS NOT NULL AND TRIM(CAST({col_quoted} AS VARCHAR)) != ''
@@ -657,7 +608,7 @@ class DataValidator:
                             SELECT {col_quoted} as value, row_number() OVER () as row_num, COUNT(*) OVER (PARTITION BY {col_quoted}) as cnt
                             FROM {table_expr} WHERE {col_quoted} IS NOT NULL AND TRIM(CAST({col_quoted} AS VARCHAR)) != ''
                         )
-                        SELECT 'duplicate' as category, '{col}' as column_name, CAST(value AS VARCHAR) as value,
+                        SELECT 'duplicate' as category, '{col}' as column_name, CAST(value AS VARCHAR) as value, 
                                'Дубликат' as error_text, cnt as count, MIN(row_num) as first_row
                         FROM ranked WHERE cnt > 1 GROUP BY value, cnt LIMIT {self.max_duplicate_examples}
                     """)
@@ -678,30 +629,20 @@ class DataValidator:
                     error_msg = str(e)
                     logger.warning(f"[Validator] Ошибка выполнения запроса: {error_msg}")
 
-                    # ============================================================
-                    # ИСПРАВЛЕНИЕ: извлекаем имя колонки из ошибки
-                    # ============================================================
                     column_name = "unknown"
-                    # Ищем "column_name" в сообщении об ошибке
-                    import re
                     match = re.search(r'column "([^"]+)"', error_msg, re.IGNORECASE)
                     if match:
                         column_name = match.group(1)
                     else:
-                        # Если не нашли, пробуем найти "Column" с большой буквы
                         match = re.search(r'Column "([^"]+)"', error_msg)
                         if match:
                             column_name = match.group(1)
 
-                    # Сокращаем сообщение об ошибке
                     short_error = error_msg
-                    # Убираем многострочность, оставляем первую строку
                     if '\n' in short_error:
                         short_error = short_error.split('\n')[0]
-                    # Убираем PATH, если есть
                     if 'LINE 4:' in short_error:
                         short_error = short_error.split('LINE 4:')[0].strip()
-                    # Обрезаем до 200 символов
                     if len(short_error) > 200:
                         short_error = short_error[:200] + "..."
 
@@ -720,8 +661,8 @@ class DataValidator:
             error_summary = {}
             for err in all_errors:
                 error_summary[err["category"]] = error_summary.get(err["category"], 0) + err["count"]
-            all_errors.sort(key=lambda x: x["count"], reverse=True)
 
+            all_errors.sort(key=lambda x: x["count"], reverse=True)
             has_errors = bool(all_errors)
             status = "FAIL" if has_errors else "OK"
 
@@ -736,7 +677,6 @@ class DataValidator:
     # =========================================================================
     # 6. ВАЛИДАЦИЯ EXCEL (построчная)
     # =========================================================================
-
     def _validate_excel(self, file_path: str, ext: str, column_rules: Dict, start_time: float) -> Dict[str, Any]:
         errors, error_summary, total_rows = [], {}, 0
         try:
@@ -761,7 +701,8 @@ class DataValidator:
                     total_rows += 1
                     self._process_row_excel(
                         {col: sheet.cell_value(row_num, col_index[col]) if col in col_index else None for col in
-                         column_rules}, row_num, column_rules, ref_sets, errors, error_summary)
+                         column_rules},
+                        row_num, column_rules, ref_sets, errors, error_summary)
             else:
                 return {"error": f"Библиотека для чтения {ext} не установлена"}
         except Exception as e:
@@ -811,7 +752,6 @@ class DataValidator:
     # =========================================================================
     # 7. ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
     # =========================================================================
-
     def _get_columns(self, file_path: str, ext: str) -> Optional[List[str]]:
         try:
             if ext == 'csv':
@@ -831,4 +771,4 @@ class DataValidator:
                 return [str(cell).strip() for cell in book.sheet_by_index(0).row_values(0)]
         except Exception as e:
             logger.error(f"[Validator] Ошибка чтения заголовков {file_path}: {e}", exc_info=True)
-        return None
+            return None
