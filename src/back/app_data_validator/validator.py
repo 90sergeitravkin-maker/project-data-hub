@@ -308,28 +308,33 @@ class DataValidator:
         # ============================================================
         # ОБРАБОТКА: если путь указывает на директорию
         # ============================================================
+        # ============================================================
+        # ОБРАБОТКА: если путь указывает на директорию
+        # ============================================================
         if path_obj.is_dir():
             supported_exts = {f'.{ext}' for ext in self.SUPPORTED_EXTENSIONS}
+
+            # ИСПРАВЛЕНИЕ: используем rglob для рекурсивного поиска во всех подпапках
             files_found = [
-                f for f in path_obj.iterdir()
+                f for f in path_obj.rglob('*')
                 if f.is_file() and f.suffix.lower() in supported_exts
             ]
 
             if not files_found:
-                all_files = list(path_obj.iterdir())
+                # Также используем rglob, чтобы честно проверить всё дерево папок
+                all_files = [f for f in path_obj.rglob('*') if f.is_file()]
                 if all_files:
-                    extensions = sorted({f.suffix.lower() for f in all_files if f.is_file()})
+                    extensions = sorted({f.suffix.lower() for f in all_files})
                     return {
-                        "error": f"В директории {file_path} нет поддерживаемых файлов",
+                        "error": f"В директории {file_path} и её подпапках нет поддерживаемых файлов",
                         "full_path": str(path_obj),
                         "supported_extensions": list(self.SUPPORTED_EXTENSIONS),
                         "found_extensions": extensions,
-                        "hint": f"В папке найдены файлы с расширениями: {extensions if extensions else 'нет файлов'}. "
-                                f"Поддерживаемые расширения: {list(self.SUPPORTED_EXTENSIONS)}"
+                        "hint": f"Найдены файлы с расширениями: {extensions}. Поддерживаются: {list(self.SUPPORTED_EXTENSIONS)}"
                     }
                 else:
                     return {
-                        "error": f"Директория пуста: {file_path}",
+                        "error": f"Директория {file_path} и все её подпапки пусты",
                         "full_path": str(path_obj),
                         "hint": "В папке нет файлов. Проверьте, что данные загружены."
                     }
