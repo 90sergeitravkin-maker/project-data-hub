@@ -87,5 +87,5 @@ alembic upgrade head
 ```
 ## Запуск прилоежения в фоновом режиме
 ```
-nohup uvicorn src.main:app --host 0.0.0.0 --port 8081 > logs/uvicorn.log 2>&1 &
+sudo -u project-data-hub sh -c 'cd /opt/data/project-data-hub && . .venv/bin/activate && nohup uvicorn src.main:app --host 0.0.0.0 --port 8081 > logs/uvicorn.log 2>&1 &'
 ```
