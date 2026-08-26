@@ -5432,8 +5432,6 @@
 @{FullName=\src\back\app_data_validator\schemas.py}
 @{FullName=\src\back\app_data_validator\services.py}
 @{FullName=\src\back\app_data_validator\validator.py}
-@{FullName=\src\back\app_data_validator\validator.py.bak}
-@{FullName=\src\back\app_data_validator\validator.py.save}
 @{FullName=\src\back\app_data_validator\__init__.py}
 @{FullName=\src\back\app_data_validator\__pycache__\api.cpython-312.pyc}
 @{FullName=\src\back\app_data_validator\__pycache__\config.cpython-312.pyc}
