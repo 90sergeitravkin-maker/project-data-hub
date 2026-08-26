@@ -1,6 +1,6 @@
 # Собираем код в файл
-$outputCode = "project_code.txt"
-$outputStructure = "project_structure.txt"
+$outputCode = "pdh_project_code.txt"
+$outputStructure = "pdh_project_structure.txt"
 
 # Очищаем файлы
 Set-Content -Path $outputCode -Value "" -Encoding UTF8

@@ -282,11 +282,6 @@
         "type": "String"
       }
     },
-    "WEB-CUSTOMS_CHN-WORLD_TRADE-1": [
-      "period",
-      "trading_partner_code",
-      "locations_of_importers_and_exporters_code"
-    ],
     "API-MACMAP-TARIFFS-1": [
       "reporter_code",
       "year"
