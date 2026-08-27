@@ -3,10 +3,13 @@ import csv
 import io
 import json
 import re
-import asyncio
 import hashlib
 import duckdb
+import shutil
+import asyncio
 
+# === ВАЖНО: Добавляем этот импорт ===
+from src.back.app_file_manager.config import AVAILABLE_ROOTS
 from datetime import datetime
 from pathlib import Path
 from functools import lru_cache
@@ -561,3 +564,77 @@ class AppDataChecker:
             error_location = "src/back/app_file_manager, download.py, строка ~350"
             logger.error(f"[PREVIEW] Критическая ошибка: {type(e).__name__}: {e} | {error_location}", exc_info=True)
             return False, {'error': f'Внутренняя ошибка: {type(e).__name__}'}
+
+    @staticmethod
+    async def move_to_external(relative_path: str) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Переносит файл или папку из TEMP в EXT с сохранением структуры.
+        Если целевая папка или файл уже существуют, они полностью заменяются.
+        """
+        # 1. Получаем корневые пути
+        temp_root = AVAILABLE_ROOTS["temp"]["path"].resolve()
+        ext_root = AVAILABLE_ROOTS["ext"]["path"].resolve()
+
+        # 2. Нормализация пути
+        clean_rel = relative_path.strip().replace("\\", "/").lstrip("/")
+        if not clean_rel:
+            return False, {"error": "Исходный путь не может быть пустым"}
+
+        # 3. Формируем полные абсолютные пути
+        src_full = (temp_root / clean_rel).resolve()
+        dst_full = (ext_root / clean_rel).resolve()
+
+        # 4. ПРОВЕРКА БЕЗОПАСНОСТИ (Защита от Path Traversal)
+        if not str(src_full).startswith(str(temp_root)):
+            logger.warning(f"[MOVE] Попытка выхода за пределы TEMP: {relative_path}")
+            return False, {"error": "Доступ запрещен: исходный путь выходит за пределы директории test"}
+
+        if not str(dst_full).startswith(str(ext_root)):
+            logger.warning(f"[MOVE] Попытка выхода за пределы EXT: {relative_path}")
+            return False, {"error": "Доступ запрещен: целевой путь выходит за пределы директории external"}
+
+        # 5. Проверка существования источника
+        if not src_full.exists():
+            return False, {"error": f"Источник не найден: {clean_rel}"}
+
+        # 6. ИТЕРАТИВНОЕ СОЗДАНИЕ РОДИТЕЛЬСКИХ ПАПОК в EXT
+        try:
+            dst_full.parent.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"[MOVE] Структура папок проверена/создана: {dst_full.parent}")
+        except PermissionError:
+            logger.error(f"[MOVE] Нет прав на создание директории: {dst_full.parent}")
+            return False, {"error": f"Нет прав на создание директории: {dst_full.parent}"}
+        except Exception as e:
+            logger.error(f"[MOVE] Ошибка создания директорий: {e}")
+            return False, {"error": f"Ошибка создания структуры папок: {str(e)}"}
+
+        # 7. ПЕРЕНОС С ЗАМЕНОЙ (в отдельном потоке, чтобы не блокировать asyncio)
+        try:
+            if src_full.is_file():
+                # --- ПЕРЕНОС ФАЙЛА ---
+                if dst_full.exists():
+                    await asyncio.to_thread(dst_full.unlink)  # Удаляем старый файл
+                await asyncio.to_thread(shutil.move, str(src_full), str(dst_full))
+            else:
+                # --- ПЕРЕНОС ПАПКИ ---
+                if dst_full.exists():
+                    # ВАЖНО: Если папка назначения уже существует, shutil.move поместит
+                    # исходную папку ВНУТРЬ неё. Чтобы сделать ЗАМЕНУ, мы сначала удаляем
+                    # старую папку целиком.
+                    logger.info(f"[MOVE] Целевая папка существует, выполняем замену: {dst_full}")
+                    await asyncio.to_thread(shutil.rmtree, str(dst_full))
+
+                # После удаления dest, shutil.move работает как мгновенное переименование (rename)
+                # на одном диске, что в тысячи раз быстрее, чем copytree + rmtree.
+                await asyncio.to_thread(shutil.move, str(src_full), str(dst_full))
+
+            logger.info(f"[MOVE] Успешно перенесено: {src_full} -> {dst_full}")
+            return True, {
+                "message": "Успешно перенесено",
+                "source": str(src_full),
+                "destination": str(dst_full),
+                "is_directory": dst_full.is_dir()
+            }
+        except Exception as e:
+            logger.error(f"[MOVE] Ошибка переноса {src_full} -> {dst_full}: {e}", exc_info=True)
+            return False, {"error": f"Ошибка переноса на уровне файловой системы: {str(e)}"}

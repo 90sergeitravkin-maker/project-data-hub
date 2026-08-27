@@ -3,8 +3,7 @@ import mimetypes
 import io
 import csv
 import duckdb
-import json
-from pathlib import Path
+
 from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, status, UploadFile, File, Form, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -17,6 +16,7 @@ from src.back.app_file_manager.schemas import (
     CheckDataResponse, CheckDataRequest,
     FoldersResponse,
     ExtractSchemaResponse, ExtractSchemaRequest, FilePreviewResponse,
+    MoveToExternalRequest,
 )
 
 router = APIRouter(tags=[TAG_NAME])
@@ -161,10 +161,7 @@ async def preview_file(request: Request,
     )
 
 
-@router.get(
-    "/download-csv",
-    summary="Скачать файл в формате CSV"
-)
+@router.get("/download-csv", summary="Скачать файл в формате CSV")
 async def download_as_csv(file_path: str = Query(..., description="Путь к файлу"),
                           root: str = Query("ext", description="Корень: ext|raw|temp")):
     """
@@ -274,3 +271,28 @@ async def download_as_csv(file_path: str = Query(..., description="Путь к �
     except Exception as e:
         logger.error(f"[CSV_DOWNLOAD] Ошибка: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Ошибка конвертации: {str(e)}")
+
+
+@router.post(
+    "/move-to-external",
+    summary="Перенос файла или папки из test (TEMP) в external (EXT)",
+    status_code=status.HTTP_200_OK
+)
+async def move_to_external(request: MoveToExternalRequest):
+    """
+    Переносит данные из временного хранилища (test) в постоянное (external).
+    Поддерживает перенос:
+    - Папки источника с датой (со всей структурой)
+    - Подпапки периода
+    - Отдельного файла
+    Структура сохраняется в целевой директории.
+    """
+    success, result = await AppDataChecker.move_to_external(
+        relative_path=request.relative_path
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get('error', 'Неизвестная ошибка')
+        )

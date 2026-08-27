@@ -144,3 +144,15 @@ class FilePreviewResponse(BaseSchema):
     has_next: bool = False
     error: Optional[str] = Field(None)
     model_config = {'from_attributes': True, 'extra': 'ignore'}
+
+
+class MoveToExternalRequest(BaseSchema):
+    """Запрос на перенос файла или папки из TEMP в EXT."""
+
+    relative_path: str = Field(
+        ...,
+        description="Относительный путь внутри папки test (TEMP). Примеры: "
+                    "'API-COMTRADE-WORLD_TRADE-1/2026-08-27' (папка с датой), "
+                    "'API-COMTRADE-WORLD_TRADE-1/2026-08-27/202601' (подпапка периода), "
+                    "'API-COMTRADE-WORLD_TRADE-1/2026-08-27/202601/data.parquet' (файл)"
+    )
