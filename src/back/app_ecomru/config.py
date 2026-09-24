@@ -106,24 +106,25 @@ PORT = int(os.getenv("ECOMRU_PORT", 8000))
 RELOAD = os.getenv("APP_ECOMRU_RELOAD", "true").lower() in ("true", "1", "yes")
 
 # KAFKA
-APP_KAFKA_URL   = os.getenv("APP_KAFKA_URL", "http://127.0.0.1:8000/api/v1/app_kafka")
+APP_KAFKA_URL = os.getenv("APP_KAFKA_URL", "http://127.0.0.1:8000/api/v1/app_kafka")
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
 
-KAFKA_DOWNLOAD_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_DOWNLOAD",    "ecomru-download"      )
+KAFKA_DOWNLOAD_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_DOWNLOAD", "ecomru-download")
 KAFKA_DOWNLOAD_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_DOWNLOAD", "ecomru-download-group")
 
-KAFKA_VERIFICATION_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_VERIFICATION",    "ecomru-verification"      )
+KAFKA_VERIFICATION_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_VERIFICATION", "ecomru-verification")
 KAFKA_VERIFICATION_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_VERIFICATION", "ecomru-verification-group")
 
-KAFKA_TRANSFER_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_TRANSFER",    "ecomru-transfer"      )
+KAFKA_TRANSFER_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_TRANSFER", "ecomru-transfer")
 KAFKA_TRANSFER_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_TRANSFER", "ecomru-transfer-group")
 
-KAFKA_REPORT_TOPIC    = os.getenv("APP_ECOMRU_KAFKA_TOPIC_REPORT",    "ecomru-report"      )
+KAFKA_REPORT_TOPIC = os.getenv("APP_ECOMRU_KAFKA_TOPIC_REPORT", "ecomru-report")
 KAFKA_REPORT_GROUP_ID = os.getenv("APP_ECOMRU_KAFKA_GROUP_ID_REPORT", "ecomru-report-group")
 
-DATA_FILE_RAW  = Path(os.getenv("APP_FAIL_MANAGER_RAW",  ""))
+DATA_FILE_TEMP = Path(os.getenv("APP_FAIL_MANAGER_TEMP", ""))
+DATA_FILE_RAW = Path(os.getenv("APP_FAIL_MANAGER_RAW", ""))
 DATA_FILE_TEST = Path(os.getenv("APP_FAIL_MANAGER_TEST", ""))
-DATA_FILE_EXT  = Path(os.getenv("APP_FAIL_MANAGER_EXT",  ""))
+DATA_FILE_EXT = Path(os.getenv("APP_FAIL_MANAGER_EXT", ""))
 MAX_FILE_SIZE = 120 * 1024 * 1024
 
 # === Строгая изоляция БД ===
@@ -135,9 +136,9 @@ ECOMRU_CHUNK_SIZE = 262144
 ECOMRU_DOWNLOAD_WORKERS = 8
 ECOMRU_RATE_PER_SECOND = 0
 
-MAX_CONCURRENT   = int(os.getenv("ECOMRU_MAX_CONCURRENT",     "5"))
+MAX_CONCURRENT = int(os.getenv("ECOMRU_MAX_CONCURRENT", "5"))
 DOWNLOAD_TIMEOUT = int(os.getenv("ECOMRU_DOWNLOAD_TIMEOUT", "300"))
-DOWNLOAD_RETRIES = int(os.getenv("ECOMRU_DOWNLOAD_RETRIES",   "3"))
+DOWNLOAD_RETRIES = int(os.getenv("ECOMRU_DOWNLOAD_RETRIES", "3"))
 
 EXTERNAL_API_URL = os.getenv("EXTERNAL_API_URL", "")
 EXTERNAL_API_KEY = os.getenv("EXTERNAL_API_KEY", "")
@@ -149,7 +150,6 @@ openapi_tags = {
 }
 
 DISK_SPACE_SAFETY_FACTOR = 2 * 1024 * 1024 * 1024  # 2 ГБ в байтах
-
 
 
 def ensure_storage_ready() -> Path:

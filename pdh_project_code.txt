@@ -213,7 +213,7 @@ from src.core.logger import config_logging, logger, get_uvicorn_log_config
 from src.core.env_loader import get_env
 
 # ============================================================
-# KAFKA - ПОЛНОСТЬЮ ВОССТАНОВЛЕНА
+# KAFKA
 # ============================================================
 from src.core.kafka import kafka_client
 from src.core.kafka_admin import ensure_topics
@@ -234,9 +234,8 @@ try:
     from src.back.app_data_validator.api import router as validator_router
     from src.back.app_data_validator.config import (
         openapi_tags as validator_openapi_tags,
-        API_PREFIX_V1 as validator_prefix
+        API_PREFIX_V1 as validator_prefix,
     )
-
     HAS_VALIDATOR = True
 except ImportError as e:
     logger.warning(f"⚠️ app_data_validator не загружен: {e}")
@@ -260,50 +259,71 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[STORAGE] Пропуск инициализации: {e}")
 
-    # === Инициализация Kafka ===
+    # ============================================================
+    # KAFKA: изолированные блоки
+    # ============================================================
+
+    # 1. Продюсер
     try:
-        # Запускаем продюсера
         await kafka_client.start()
         logger.info("[KAFKA] Продюсер запущен")
+    except Exception as e:
+        logger.error(f"[KAFKA] Не удалось запустить продюсера: {e}", exc_info=True)
 
-        # Создаём необходимые топики
+    # 2. Топики
+    try:
         required_topics = get_required_topics()
         await ensure_topics(required_topics, partitions=3, replication=1)
         logger.info(f"[KAFKA] Топики созданы/проверены: {required_topics}")
-
-        # Регистрируем обработчики
-        kafka_client.register_consumer(
-            KAFKA_DOWNLOAD_TOPIC,
-            KAFKA_DOWNLOAD_GROUP_ID,
-            handle_download_task
-        )
-        kafka_client.register_consumer(
-            KAFKA_VERIFICATION_TOPIC,
-            KAFKA_VERIFICATION_GROUP_ID,
-            handle_verification_task
-        )
-        kafka_client.register_consumer(
-            PROCESS_FOLDER_TOPIC,
-            PROCESS_FOLDER_GROUP_ID,
-            handle_process_folder_task
-        )
-        kafka_client.register_consumer(
-            KAFKA_VALIDATION_INPUT_TOPIC,
-            KAFKA_VALIDATION_INPUT_GROUP,
-            ValidationService.handle_validation_task
-        )
-        logger.info(
-            f"[KAFKA] Валидатор зарегистрирован: "
-            f"topic={KAFKA_VALIDATION_INPUT_TOPIC}, "
-            f"group={KAFKA_VALIDATION_INPUT_GROUP}"
-        )
-
-        # Запускаем консьюмеров в фоновом режиме
-        asyncio.create_task(kafka_client.run_consumers())
-        logger.info("[KAFKA] Консьюмеры запущены")
-
     except Exception as e:
-        logger.error(f"[KAFKA] Ошибка инициализации: {e}", exc_info=True)
+        logger.error(f"[KAFKA] Ошибка создания топиков: {e}", exc_info=True)
+
+    # 3. Базовые консьюмеры
+    _base_consumers = [
+        ("ecomru-download",     KAFKA_DOWNLOAD_TOPIC,     KAFKA_DOWNLOAD_GROUP_ID,     handle_download_task),
+        ("ecomru-verification", KAFKA_VERIFICATION_TOPIC, KAFKA_VERIFICATION_GROUP_ID, handle_verification_task),
+        ("process-folder",      PROCESS_FOLDER_TOPIC,     PROCESS_FOLDER_GROUP_ID,     handle_process_folder_task),
+    ]
+    for name, topic, group_id, handler in _base_consumers:
+        try:
+            kafka_client.register_consumer(topic, group_id, handler)
+            logger.info(f"[KAFKA] Зарегистрирован '{name}': topic={topic}, group={group_id}")
+        except Exception as e:
+            logger.error(f"[KAFKA] Не удалось зарегистрировать '{name}': {e}", exc_info=True)
+
+    # 4. Валидатор — опционально, отдельный try
+    if HAS_VALIDATOR:
+        try:
+            from src.back.app_data_validator.config import (
+                KAFKA_VALIDATION_INPUT_TOPIC,
+                KAFKA_VALIDATION_INPUT_GROUP,
+            )
+            from src.back.app_data_validator.services import ValidationService
+
+            kafka_client.register_consumer(
+                KAFKA_VALIDATION_INPUT_TOPIC,
+                KAFKA_VALIDATION_INPUT_GROUP,
+                ValidationService.handle_validation_task,
+            )
+            logger.info(
+                f"[KAFKA] Валидатор зарегистрирован: "
+                f"topic={KAFKA_VALIDATION_INPUT_TOPIC}, "
+                f"group={KAFKA_VALIDATION_INPUT_GROUP}"
+            )
+        except Exception as e:
+            logger.error(f"[KAFKA] Валидатор не зарегистрирован: {e}", exc_info=True)
+    else:
+        logger.warning("[KAFKA] app_data_validator недоступен — консьюмер валидатора пропущен")
+
+    # 5. Запуск консьюмеров — в самом конце, вне try, но с проверкой handlers
+    try:
+        if kafka_client.handlers:
+            asyncio.create_task(kafka_client.run_consumers())
+            logger.info(f"[KAFKA] Консьюмеры запущены: {list(kafka_client.handlers.keys())}")
+        else:
+            logger.error("[KAFKA] Нет зарегистрированных консьюмеров — run_consumers() не запущен")
+    except Exception as e:
+        logger.error(f"[KAFKA] Ошибка запуска run_consumers(): {e}", exc_info=True)
 
     logger.info("✅ Приложение успешно запущено и готово принимать запросы!")
 
@@ -4437,9 +4457,9 @@ class DuckDBFileManager:
         :param test_dir:      Корневая директория для результатов     (если None – используется DATA_FILE_TEST)
         :param max_file_size: Максимальный размер файла при разбиении (если None – используется MAX_FILE_SIZE)
         """
-        self.raw_dir       = Path(raw_dir)  if raw_dir  else DATA_FILE_RAW
-        self.test_dir      = Path(test_dir) if test_dir else DATA_FILE_TEST
-        self.max_file_size = max_file_size  if max_file_size is not None else MAX_FILE_SIZE
+        self.raw_dir = Path(raw_dir) if raw_dir else DATA_FILE_RAW
+        self.test_dir = Path(test_dir) if test_dir else DATA_FILE_TEST
+        self.max_file_size = max_file_size if max_file_size is not None else MAX_FILE_SIZE
 
     # ---------- Вспомогательные методы работы с папками ----------
     @staticmethod
@@ -4612,6 +4632,8 @@ class DuckDBFileManager:
 
         try:
             with duckdb.connect() as con:
+                con.execute(f"SET memory_limit='{self.memory_limit}'")
+                con.execute("SET threads TO 4")
                 query = f"DESCRIBE FROM {readers[ext]}(?)"
                 result = con.execute(query, [filepath]).fetchall()
                 return result
@@ -4647,6 +4669,8 @@ class DuckDBFileManager:
         files_str = ", ".join([f"'{f.as_posix()}'" for f in files])
 
         with duckdb.connect() as con:
+            con.execute(f"SET memory_limit='{self.memory_limit}'")
+            con.execute("SET threads TO 4")
             try:
                 # Получаем для каждого dataset_checksum: контрольную сумму и количество строк
                 sql = f"""
@@ -5098,8 +5122,7 @@ import mimetypes
 import io
 import csv
 import duckdb
-import json
-from pathlib import Path
+
 from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, status, UploadFile, File, Form, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -5112,6 +5135,7 @@ from src.back.app_file_manager.schemas import (
     CheckDataResponse, CheckDataRequest,
     FoldersResponse,
     ExtractSchemaResponse, ExtractSchemaRequest, FilePreviewResponse,
+    MoveToExternalRequest,
 )
 
 router = APIRouter(tags=[TAG_NAME])
@@ -5256,10 +5280,7 @@ async def preview_file(request: Request,
     )
 
 
-@router.get(
-    "/download-csv",
-    summary="Скачать файл в формате CSV"
-)
+@router.get("/download-csv", summary="Скачать файл в формате CSV")
 async def download_as_csv(file_path: str = Query(..., description="Путь к файлу"),
                           root: str = Query("ext", description="Корень: ext|raw|temp")):
     """
@@ -5369,6 +5390,31 @@ async def download_as_csv(file_path: str = Query(..., description="Путь к �
     except Exception as e:
         logger.error(f"[CSV_DOWNLOAD] Ошибка: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Ошибка конвертации: {str(e)}")
+
+
+@router.post(
+    "/move-to-external",
+    summary="Перенос файла или папки из test (TEMP) в external (EXT)",
+    status_code=status.HTTP_200_OK
+)
+async def move_to_external(request: MoveToExternalRequest):
+    """
+    Переносит данные из временного хранилища (test) в постоянное (external).
+    Поддерживает перенос:
+    - Папки источника с датой (со всей структурой)
+    - Подпапки периода
+    - Отдельного файла
+    Структура сохраняется в целевой директории.
+    """
+    success, result = await AppDataChecker.move_to_external(
+        relative_path=request.relative_path
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get('error', 'Неизвестная ошибка')
+        )
 
 ----------------------------------------
 FILE: src\back\app_file_manager\config.py
@@ -5650,6 +5696,18 @@ class FilePreviewResponse(BaseSchema):
     error: Optional[str] = Field(None)
     model_config = {'from_attributes': True, 'extra': 'ignore'}
 
+
+class MoveToExternalRequest(BaseSchema):
+    """Запрос на перенос файла или папки из TEMP в EXT."""
+
+    relative_path: str = Field(
+        ...,
+        description="Относительный путь внутри папки test (TEMP). Примеры: "
+                    "'API-COMTRADE-WORLD_TRADE-1/2026-08-27' (папка с датой), "
+                    "'API-COMTRADE-WORLD_TRADE-1/2026-08-27/202601' (подпапка периода), "
+                    "'API-COMTRADE-WORLD_TRADE-1/2026-08-27/202601/data.parquet' (файл)"
+    )
+
 ----------------------------------------
 FILE: src\back\app_file_manager\services.py
 ----------------------------------------
@@ -5658,10 +5716,13 @@ import csv
 import io
 import json
 import re
-import asyncio
 import hashlib
 import duckdb
+import shutil
+import asyncio
 
+# === ВАЖНО: Добавляем этот импорт ===
+from src.back.app_file_manager.config import AVAILABLE_ROOTS
 from datetime import datetime
 from pathlib import Path
 from functools import lru_cache
@@ -6216,6 +6277,80 @@ class AppDataChecker:
             error_location = "src/back/app_file_manager, download.py, строка ~350"
             logger.error(f"[PREVIEW] Критическая ошибка: {type(e).__name__}: {e} | {error_location}", exc_info=True)
             return False, {'error': f'Внутренняя ошибка: {type(e).__name__}'}
+
+    @staticmethod
+    async def move_to_external(relative_path: str) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Переносит файл или папку из TEMP в EXT с сохранением структуры.
+        Если целевая папка или файл уже существуют, они полностью заменяются.
+        """
+        # 1. Получаем корневые пути
+        temp_root = AVAILABLE_ROOTS["temp"]["path"].resolve()
+        ext_root = AVAILABLE_ROOTS["ext"]["path"].resolve()
+
+        # 2. Нормализация пути
+        clean_rel = relative_path.strip().replace("\\", "/").lstrip("/")
+        if not clean_rel:
+            return False, {"error": "Исходный путь не может быть пустым"}
+
+        # 3. Формируем полные абсолютные пути
+        src_full = (temp_root / clean_rel).resolve()
+        dst_full = (ext_root / clean_rel).resolve()
+
+        # 4. ПРОВЕРКА БЕЗОПАСНОСТИ (Защита от Path Traversal)
+        if not str(src_full).startswith(str(temp_root)):
+            logger.warning(f"[MOVE] Попытка выхода за пределы TEMP: {relative_path}")
+            return False, {"error": "Доступ запрещен: исходный путь выходит за пределы директории test"}
+
+        if not str(dst_full).startswith(str(ext_root)):
+            logger.warning(f"[MOVE] Попытка выхода за пределы EXT: {relative_path}")
+            return False, {"error": "Доступ запрещен: целевой путь выходит за пределы директории external"}
+
+        # 5. Проверка существования источника
+        if not src_full.exists():
+            return False, {"error": f"Источник не найден: {clean_rel}"}
+
+        # 6. ИТЕРАТИВНОЕ СОЗДАНИЕ РОДИТЕЛЬСКИХ ПАПОК в EXT
+        try:
+            dst_full.parent.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"[MOVE] Структура папок проверена/создана: {dst_full.parent}")
+        except PermissionError:
+            logger.error(f"[MOVE] Нет прав на создание директории: {dst_full.parent}")
+            return False, {"error": f"Нет прав на создание директории: {dst_full.parent}"}
+        except Exception as e:
+            logger.error(f"[MOVE] Ошибка создания директорий: {e}")
+            return False, {"error": f"Ошибка создания структуры папок: {str(e)}"}
+
+        # 7. ПЕРЕНОС С ЗАМЕНОЙ (в отдельном потоке, чтобы не блокировать asyncio)
+        try:
+            if src_full.is_file():
+                # --- ПЕРЕНОС ФАЙЛА ---
+                if dst_full.exists():
+                    await asyncio.to_thread(dst_full.unlink)  # Удаляем старый файл
+                await asyncio.to_thread(shutil.move, str(src_full), str(dst_full))
+            else:
+                # --- ПЕРЕНОС ПАПКИ ---
+                if dst_full.exists():
+                    # ВАЖНО: Если папка назначения уже существует, shutil.move поместит
+                    # исходную папку ВНУТРЬ неё. Чтобы сделать ЗАМЕНУ, мы сначала удаляем
+                    # старую папку целиком.
+                    logger.info(f"[MOVE] Целевая папка существует, выполняем замену: {dst_full}")
+                    await asyncio.to_thread(shutil.rmtree, str(dst_full))
+
+                # После удаления dest, shutil.move работает как мгновенное переименование (rename)
+                # на одном диске, что в тысячи раз быстрее, чем copytree + rmtree.
+                await asyncio.to_thread(shutil.move, str(src_full), str(dst_full))
+
+            logger.info(f"[MOVE] Успешно перенесено: {src_full} -> {dst_full}")
+            return True, {
+                "message": "Успешно перенесено",
+                "source": str(src_full),
+                "destination": str(dst_full),
+                "is_directory": dst_full.is_dir()
+            }
+        except Exception as e:
+            logger.error(f"[MOVE] Ошибка переноса {src_full} -> {dst_full}: {e}", exc_info=True)
+            return False, {"error": f"Ошибка переноса на уровне файловой системы: {str(e)}"}
 
 ----------------------------------------
 FILE: src\back\app_file_manager\__init__.py

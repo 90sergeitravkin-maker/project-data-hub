@@ -28,9 +28,9 @@ class DuckDBFileManager:
         :param test_dir:      Корневая директория для результатов     (если None – используется DATA_FILE_TEST)
         :param max_file_size: Максимальный размер файла при разбиении (если None – используется MAX_FILE_SIZE)
         """
-        self.raw_dir       = Path(raw_dir)  if raw_dir  else DATA_FILE_RAW
-        self.test_dir      = Path(test_dir) if test_dir else DATA_FILE_TEST
-        self.max_file_size = max_file_size  if max_file_size is not None else MAX_FILE_SIZE
+        self.raw_dir = Path(raw_dir) if raw_dir else DATA_FILE_RAW
+        self.test_dir = Path(test_dir) if test_dir else DATA_FILE_TEST
+        self.max_file_size = max_file_size if max_file_size is not None else MAX_FILE_SIZE
 
     # ---------- Вспомогательные методы работы с папками ----------
     @staticmethod
@@ -203,6 +203,8 @@ class DuckDBFileManager:
 
         try:
             with duckdb.connect() as con:
+                con.execute(f"SET memory_limit='{self.memory_limit}'")
+                con.execute("SET threads TO 4")
                 query = f"DESCRIBE FROM {readers[ext]}(?)"
                 result = con.execute(query, [filepath]).fetchall()
                 return result
@@ -238,6 +240,8 @@ class DuckDBFileManager:
         files_str = ", ".join([f"'{f.as_posix()}'" for f in files])
 
         with duckdb.connect() as con:
+            con.execute(f"SET memory_limit='{self.memory_limit}'")
+            con.execute("SET threads TO 4")
             try:
                 # Получаем для каждого dataset_checksum: контрольную сумму и количество строк
                 sql = f"""

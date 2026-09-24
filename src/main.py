@@ -21,7 +21,7 @@ from src.core.logger import config_logging, logger, get_uvicorn_log_config
 from src.core.env_loader import get_env
 
 # ============================================================
-# KAFKA - ПОЛНОСТЬЮ ВОССТАНОВЛЕНА
+# KAFKA
 # ============================================================
 from src.core.kafka import kafka_client
 from src.core.kafka_admin import ensure_topics
@@ -42,9 +42,8 @@ try:
     from src.back.app_data_validator.api import router as validator_router
     from src.back.app_data_validator.config import (
         openapi_tags as validator_openapi_tags,
-        API_PREFIX_V1 as validator_prefix
+        API_PREFIX_V1 as validator_prefix,
     )
-
     HAS_VALIDATOR = True
 except ImportError as e:
     logger.warning(f"⚠️ app_data_validator не загружен: {e}")
@@ -68,50 +67,71 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[STORAGE] Пропуск инициализации: {e}")
 
-    # === Инициализация Kafka ===
+    # ============================================================
+    # KAFKA: изолированные блоки
+    # ============================================================
+
+    # 1. Продюсер
     try:
-        # Запускаем продюсера
         await kafka_client.start()
         logger.info("[KAFKA] Продюсер запущен")
+    except Exception as e:
+        logger.error(f"[KAFKA] Не удалось запустить продюсера: {e}", exc_info=True)
 
-        # Создаём необходимые топики
+    # 2. Топики
+    try:
         required_topics = get_required_topics()
         await ensure_topics(required_topics, partitions=3, replication=1)
         logger.info(f"[KAFKA] Топики созданы/проверены: {required_topics}")
-
-        # Регистрируем обработчики
-        kafka_client.register_consumer(
-            KAFKA_DOWNLOAD_TOPIC,
-            KAFKA_DOWNLOAD_GROUP_ID,
-            handle_download_task
-        )
-        kafka_client.register_consumer(
-            KAFKA_VERIFICATION_TOPIC,
-            KAFKA_VERIFICATION_GROUP_ID,
-            handle_verification_task
-        )
-        kafka_client.register_consumer(
-            PROCESS_FOLDER_TOPIC,
-            PROCESS_FOLDER_GROUP_ID,
-            handle_process_folder_task
-        )
-        kafka_client.register_consumer(
-            KAFKA_VALIDATION_INPUT_TOPIC,
-            KAFKA_VALIDATION_INPUT_GROUP,
-            ValidationService.handle_validation_task
-        )
-        logger.info(
-            f"[KAFKA] Валидатор зарегистрирован: "
-            f"topic={KAFKA_VALIDATION_INPUT_TOPIC}, "
-            f"group={KAFKA_VALIDATION_INPUT_GROUP}"
-        )
-
-        # Запускаем консьюмеров в фоновом режиме
-        asyncio.create_task(kafka_client.run_consumers())
-        logger.info("[KAFKA] Консьюмеры запущены")
-
     except Exception as e:
-        logger.error(f"[KAFKA] Ошибка инициализации: {e}", exc_info=True)
+        logger.error(f"[KAFKA] Ошибка создания топиков: {e}", exc_info=True)
+
+    # 3. Базовые консьюмеры
+    _base_consumers = [
+        ("ecomru-download",     KAFKA_DOWNLOAD_TOPIC,     KAFKA_DOWNLOAD_GROUP_ID,     handle_download_task),
+        ("ecomru-verification", KAFKA_VERIFICATION_TOPIC, KAFKA_VERIFICATION_GROUP_ID, handle_verification_task),
+        ("process-folder",      PROCESS_FOLDER_TOPIC,     PROCESS_FOLDER_GROUP_ID,     handle_process_folder_task),
+    ]
+    for name, topic, group_id, handler in _base_consumers:
+        try:
+            kafka_client.register_consumer(topic, group_id, handler)
+            logger.info(f"[KAFKA] Зарегистрирован '{name}': topic={topic}, group={group_id}")
+        except Exception as e:
+            logger.error(f"[KAFKA] Не удалось зарегистрировать '{name}': {e}", exc_info=True)
+
+    # 4. Валидатор — опционально, отдельный try
+    if HAS_VALIDATOR:
+        try:
+            from src.back.app_data_validator.config import (
+                KAFKA_VALIDATION_INPUT_TOPIC,
+                KAFKA_VALIDATION_INPUT_GROUP,
+            )
+            from src.back.app_data_validator.services import ValidationService
+
+            kafka_client.register_consumer(
+                KAFKA_VALIDATION_INPUT_TOPIC,
+                KAFKA_VALIDATION_INPUT_GROUP,
+                ValidationService.handle_validation_task,
+            )
+            logger.info(
+                f"[KAFKA] Валидатор зарегистрирован: "
+                f"topic={KAFKA_VALIDATION_INPUT_TOPIC}, "
+                f"group={KAFKA_VALIDATION_INPUT_GROUP}"
+            )
+        except Exception as e:
+            logger.error(f"[KAFKA] Валидатор не зарегистрирован: {e}", exc_info=True)
+    else:
+        logger.warning("[KAFKA] app_data_validator недоступен — консьюмер валидатора пропущен")
+
+    # 5. Запуск консьюмеров — в самом конце, вне try, но с проверкой handlers
+    try:
+        if kafka_client.handlers:
+            asyncio.create_task(kafka_client.run_consumers())
+            logger.info(f"[KAFKA] Консьюмеры запущены: {list(kafka_client.handlers.keys())}")
+        else:
+            logger.error("[KAFKA] Нет зарегистрированных консьюмеров — run_consumers() не запущен")
+    except Exception as e:
+        logger.error(f"[KAFKA] Ошибка запуска run_consumers(): {e}", exc_info=True)
 
     logger.info("✅ Приложение успешно запущено и готово принимать запросы!")
 
